@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>小羊模型对比</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #a9cbee; font: 13px/1.5 -apple-system, "PingFang SC", sans-serif; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #bar {
+    position: fixed; left: 12px; top: 12px; padding: 8px 12px; border-radius: 8px;
+    background: rgba(0, 0, 0, .5); color: #fff;
+  }
+  #bar button { font: inherit; margin-right: 6px; padding: 3px 10px; border-radius: 5px; border: 0; cursor: pointer; }
+  #bar button.on { background: #ffd66b; }
+  .tag {
+    position: fixed; transform: translate(-50%, 0); padding: 2px 8px; border-radius: 5px;
+    background: rgba(0, 0, 0, .55); color: #fff; white-space: nowrap; pointer-events: none;
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div id="bar">
+  <button data-mode="graze" class="on">吃草</button>
+  <button data-mode="look">抬头</button>
+  <button data-mode="walk">走路</button>
+  <button data-mode="trot">小跑</button>
+  <span style="opacity:.7">拖动旋转 · 滚轮缩放</span>
+</div>
+<script type="module">
+  // 开发期防缓存：每次加载都换一个路径前缀（serve.py 会把 /v<数字>/ 去掉），
+  // 浏览器里以前缓存的旧脚本永远命中不到。用别的静态服务器时自动退回普通路径。
+  const base = `./v${Date.now()}/`;
+  const ok = await fetch(`${base}src/compare.js`, { method: 'HEAD', cache: 'no-store' }).then((r) => r.ok).catch(() => false);
+  await import(`${ok ? base : './'}src/compare.js`);
+</script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>伊犁 · 牧羊</title>
+<style>
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: #a9cbee;
+    -webkit-user-select: none; user-select: none;
+  }
+  #c {
+    position: fixed; inset: 0; width: 100%; height: 100%;
+    display: block; touch-action: none; cursor: grab;
+  }
+  #c.dragging { cursor: grabbing; }
+  #veil {
+    position: fixed; inset: 0; pointer-events: none;
+    background: #fbf6ea; transition: opacity 2.2s ease;
+  }
+  #veil.gone { opacity: 0; }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="veil"></div>
+<script type="module">
+  // 开发期防缓存：每次加载都换一个路径前缀（serve.py 会把 /v<数字>/ 去掉），
+  // 浏览器里以前缓存的旧脚本永远命中不到。用别的静态服务器时自动退回普通路径。
+  const base = `./v${Date.now()}/`;
+  const ok = await fetch(`${base}src/main.js`, { method: 'HEAD', cache: 'no-store' }).then((r) => r.ok).catch(() => false);
+  await import(`${ok ? base : './'}src/main.js`);
+</script>
+</body>
+</html>
