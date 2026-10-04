@@ -2,7 +2,7 @@ import GUI from 'three/addons/libs/lil-gui.module.min.js';
 import { TUNING_DEFAULTS, TUNING_PRESETS, applyTuning } from './config.js';
 import { saveTuning } from './tuning.js';
 
-// 开发用的调节面板（右上角，按 G 显示 / 隐藏）。
+// 开发版的调节面板（右上角，按 G 显示 / 隐藏）。
 // 每次改动都会存到浏览器和项目里的 tuning.json（需要用 serve.py 启动），下次打开就是调好的样子。
 
 export function createDevPanel(U, tuning, { onSheepStyle } = {}) {
@@ -12,7 +12,7 @@ export function createDevPanel(U, tuning, { onSheepStyle } = {}) {
   };
 
   const gui = new GUI({ title: '画面调节（G 隐藏）' });
-  // 帧率（每秒刷新一次），方便看在你的机器上跑得怎么样
+  // 帧率（每秒刷新一次）
   const stats = { fps: '—' };
   gui.add(stats, 'fps').name('帧率').disable().listen();
   let frames = 0, last = performance.now();

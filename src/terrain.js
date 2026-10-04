@@ -48,7 +48,7 @@ export function horizonHeight(x, z) {
 }
 
 // 河谷下游远处的湖（坐标相对远景圈的中心，也就是人所在位置的河谷中线）。
-// 湖和远景圈一起跟着人走，所以永远在一公里开外——只能远远地望着，几条溪流都朝它流去。
+// 湖和远景圈一起跟着人走，所以永远在几百米开外，只能远远地望着；几条溪流都朝它流去。
 // level 是湖面相对人所在处谷底的高度；近岸是草甸的低洼处没进湖面里，岸线自然弯曲
 export const LAKE = { u0: 450, u1: 3300, half: 520, level: -0.03 * 650 - 6 };
 export function lakeSdf(u, v) {
@@ -134,7 +134,7 @@ void main() {
   float rock = smoothstep(265.0 + big * 90.0 + mn * 60.0, 345.0 + big * 90.0, h + (gully - 0.5) * 60.0);
   rock = max(rock, smoothstep(0.42, 0.68, 1.0 - N.y) * smoothstep(200.0, 280.0, h));
   alb = mix(alb, uRock * (0.75 + 0.4 * mn) * (0.85 + 0.3 * gully), clamp(rock, 0.0, 1.0));
-  // 雪：雪线不是一条平线——
+  // 雪：
   //   · 沿着山脉大幅起伏（几百米一个波，±100 米）；
   //   · 沟里积雪，顺着冲沟往下拖出一条条雪舌，山脊和陡壁露出岩石；
   //   · 背阴的坡留得住雪，雪线更低；边缘被打碎成一块块残雪
@@ -219,9 +219,7 @@ void main() {
   float gustFade = smoothstep(14.0, 30.0, dist) * (1.0 - smoothstep(120.0, 300.0, dist));
   col += uSunColor * alb * 0.35 * gustAt(p) * gustFade * sv * (1.0 - fm);
 
-  // 溪水（参考 earth_history）：水本身偏深，映出深蓝的天；细碎的波纹顺流而下，
-  // 太阳在每一道波纹上留下一个很亮的小高光，经过辉光晕开就是一片闪闪发亮的碎光。
-  // 远处的波纹小于一个像素，就把高光放宽成一条朝太阳方向的光带，带一点金色
+  // 溪水：水本身偏深，映出天空；细碎的波纹顺流而下
   if (water > 0.001) {
     vec3 V = normalize(cameraPosition - vWorld);
     float along = alongValley(p), acr = acrossValley(p);
@@ -233,10 +231,8 @@ void main() {
     vec2 q1 = r * vec2(1.1, 2.0) + vec2(-uTime * 1.3, 0.0);
     vec2 q2 = R2 * (r * vec2(2.9, 4.4)) + vec2(-uTime * 2.1, uTime * 0.25);
     vec2 q3 = R3 * (r * vec2(6.5, 7.5)) + vec2(-uTime * 3.2, -uTime * 0.4);
-    // 每个像素盖住多少个波纹单位：某一层波纹细到一个像素以下时就把它淡出（否则每个像素随机亮一下，像雪花屏），
-    // 淡出的那部分起伏折算成更大的粗糙度——远处的碎光就合成一条柔和的光带
-    // 像素盖住的范围按面积估计（斜看时被压扁的那个方向不算满），过渡放得很宽，
-    // 细节是一点点淡出的，看不出“近处精细、远处平滑”的分界
+    // 每个像素盖住多少个波纹单位：某一层波纹细到一个像素以下时就把它淡出（否则会逐像素闪烁），
+    // 淡出的那部分起伏折算成更大的粗糙度。像素覆盖范围按面积估计，过渡放得很宽
     vec2 rx = dFdx(r), ry = dFdy(r);
     float fpArea = sqrt(abs(rx.x * ry.y - rx.y * ry.x));
     float fp = max(mix(fpArea, length(rx) + length(ry), 0.5), 1e-4);
@@ -291,7 +287,7 @@ void main() {
 #endif
 
   vec3 outC = applyFog(col, vWorld);
-  // 高处的山体站在雾气上面：雪峰和山坡保持清楚的颜色和明暗（像插画里那样），只有山脚融进雾里
+  // 高处的山体站在雾气上面：雪峰和山坡保持清楚的颜色和明暗，只有山脚融进雾里
   // （区块地形和远景圈用同一个规则，两者交接处才不会出现一块颜色不同的区域）
   outC = mix(outC, mix(col, outC, 0.5), smoothstep(20.0, 420.0, h));
 
@@ -451,7 +447,7 @@ void main() {
   float path = smoothstep(0.78, 1.0, az);
   float sunLit = cloudShadow(vWorld.xz);
   // 碎光：以湖为参照的小格子（越远格子越长，保持三四个像素大），每格里一颗圆圆的亮点随机闪一下，
-  // 朝太阳的光路上更密——远看是一片波光粼粼（不用大块的亮纹，那样会像流动的白斑）
+  // 朝太阳的光路上更密，远看是一片波光粼粼
   float r = length(p);
   vec2 cc = vec2(atan(p.y, p.x) / 0.0038, log(r) / 0.11);
   vec2 cell = floor(cc);

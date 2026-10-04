@@ -151,7 +151,7 @@ const LOOK_KEY = 'yili.sheepLook';
 const readLookPref = () => {
   try { return localStorage.getItem(LOOK_KEY); } catch { return null; }
 };
-// 记住的选择可能已经被删掉了（比如以前的 1、2 号模型），对不上就用默认的第一个
+// 记住的选择对不上现有的模型时，用默认的第一个
 let lookId = DEV ? lookDef(new URLSearchParams(location.search).get('sheep') || readLookPref()).id : SHEEP_LOOKS[0].id;
 let firstLook;
 try {
@@ -264,7 +264,7 @@ function removeSheep(px, py) {
   flock.dismiss(target, camera.position, f.x, f.z);
 }
 
-// —— 开发用：切换小羊模型（数字键 1–4 / M 轮换 / ?sheep=id）——
+// —— 开发版：切换小羊模型（数字键 1–3 / M 轮换 / ?sheep=id）——
 const devLabel = document.createElement('div');
 Object.assign(devLabel.style, {
   position: 'fixed', left: '14px', bottom: '12px', padding: '4px 10px', borderRadius: '6px',

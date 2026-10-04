@@ -30,7 +30,7 @@ export class Music {
     this.in = ctx.createGain();
     this.in.connect(dry).connect(out);
     this.in.connect(conv).connect(wet).connect(out);
-    // 笛子的音色：基音为主，几个弱泛音（比上一版亮一点）
+    // 笛子的音色：基音为主，几个弱泛音
     const real = new Float32Array([0, 1, 0.42, 0.2, 0.1, 0.05, 0.025]);
     this.wave = ctx.createPeriodicWave(real, new Float32Array(real.length));
     this.plucks = {
@@ -140,7 +140,7 @@ export class Music {
     const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2600; bp.Q.value = 0.8;
     const bg = ctx.createGain(); bg.gain.value = 0.12;
     br.connect(bp).connect(bg).connect(mix);
-    // 一点点喉音持续音（比上一版轻）
+    // 一点点喉音持续音
     const hum = ctx.createOscillator(); hum.type = 'sawtooth'; hum.frequency.value = 146.83;
     const hlp = ctx.createBiquadFilter(); hlp.type = 'lowpass'; hlp.frequency.value = 380;
     const hg = ctx.createGain(); hg.gain.value = 0.09;

@@ -47,7 +47,7 @@ void main() {
 // —— 辉光 ——
 // 逐级缩小（13 点采样，第一级只取超过阈值的亮部，并按亮度加权平均，压住单个像素的闪烁），
 // 再逐级放大（3×3 帐篷滤波）叠回去。每一级都是平滑的滤波，所以一粒很小的水面闪光
-// 会晕成一圈圆润的光，而不是低分辨率层级上的一个方块。
+// 会晕成一圈圆润的光。
 const quadVert = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
 const downFrag = /* glsl */ `
 uniform sampler2D tSrc;

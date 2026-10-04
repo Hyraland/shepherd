@@ -98,7 +98,7 @@ export const TUNING_DEFAULTS = {
 
 // 面板里的预设：只覆盖列出来的项，其余（比如羊）保持不变
 export const TUNING_PRESETS = {
-  '原野（参考 earth_history 的结尾）': {
+  '原野': {
     grass: { light: '#a9b95c', lightDeep: '#7f8f42', shadow: '#5a678c', variation: 0.4, flowers: 0.45 },
     sky: {
       elevation: 24, azimuth: 0, sun: 2.4, skyLight: 0.6, zenith: '#2a66bd', horizon: '#c2d8ee',
@@ -106,7 +106,7 @@ export const TUNING_PRESETS = {
     },
     water: { color: '#1d3a44', reflection: 0.85, ripple: 1.0, glitter: 1.0, glitterColor: '#ffe2a8', lake: '#2f6fae' },
   },
-  '我上一版调的': {
+  '深蓝天空': {
     grass: { toon: true, light: '#c7ea66', lightDeep: '#4c66a4', shadow: '#5c69a3', edge: 0.05, softness: 0.045, variation: 0.35, flowers: 0 },
     sky: {
       elevation: 28.5, azimuth: 1, sun: 3.75, skyLight: 0.6, zenith: '#0056b3', horizon: '#5681c8', exposure: 2.2,
@@ -218,13 +218,13 @@ export function applyTuning(U, t) {
   screenColor(g.shadow, U.uToonShadow.value);
   U.uToonEdge.value.set(g.edge, g.softness);
   U.uToonVar.value = g.variation;
-  // 云杉林：亮面 / 暗面单独调（默认值是原来从草地颜色推出来的那一对）
+  // 云杉林：亮面 / 暗面，和草地分开调
   screenColor(t.forest.lit, U.uForestLit.value);
   screenColor(t.forest.shade, U.uForestShade.value);
   U.uForestHues.value = t.forest.hues;
 
   screenColor(s.light, U.uSheepLight.value);
-  // 羊的暗面：按 followGrass 向草地暗面的色相靠拢（保持原来的亮度）
+  // 羊的暗面：按 followGrass 向草地暗面的色相靠拢（亮度不变）
   _a.set(s.shadow);
   _b.set(g.shadow);
   const la = _a.r * 0.2126 + _a.g * 0.7152 + _a.b * 0.0722;

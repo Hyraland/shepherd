@@ -20,7 +20,7 @@ function blobTexture() {
 export const SHEEP_CAPACITY = 96;
 
 // 每只羊的“骨架”：只是一组 Object3D，由羊群逻辑摆姿势（位置、朝向、坡度、点头、迈腿），
-// 外观（内置的程序模型或下载的 glTF）再按这副骨架画出来。
+// 外观（glTF 模型，见 sheepModels.js）再按这副骨架画出来。
 export function createRig() {
   const root = new THREE.Object3D();
   const tilt = new THREE.Object3D();

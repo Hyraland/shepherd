@@ -10,8 +10,7 @@ float vnoise(vec2 p) {
 }
 
 // 带导数的梯度噪声（每个格点一个随机方向，取自噪声纹理里的格点值），返回 (值, ∂/∂x, ∂/∂y)。
-// 导数处处连续，而且不像值噪声那样在每个格点都是平的——用来算水面波纹的法线时，
-// 太阳的高光是一粒粒不规则的碎光，不会排成一格一格的方块
+// 导数处处连续，格点处也不平坦，用来算水面波纹的法线时不会出现方块状的高光
 vec2 ngrad(vec2 c) {
   ivec2 t = ivec2(mod(c, 32.0)) * 8;
   float a = texelFetch(uNoise, t, 0).r * 6.2831853;
@@ -192,7 +191,7 @@ float cloudShadowFast(vec2 p) {
   return 1.0 - uCloud.y * cloudMaskAt(n);
 }
 
-// 太阳的投影阴影（羊、毡房落在草上和地上的影子），5 点 PCF
+// 太阳的投影阴影（羊落在草上和地上的影子），5 点 PCF
 float sunShadow(vec3 wp) {
   if (uShadowOn < 0.5) return 1.0;
   vec4 sc = uShadowMatrix * vec4(wp, 1.0);

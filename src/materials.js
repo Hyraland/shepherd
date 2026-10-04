@@ -3,7 +3,7 @@ import { NOISE, CLOUD } from './shaders.js';
 import { noiseTexture } from './noiseTexture.js';
 import { cloudUniform } from './config.js';
 
-// three 自带 PBR 材质（羊、树、毡房、外部模型）补上和草地一致的云影：
+// 给 three 自带的 PBR 材质（写实模式下的羊）补上和草地一致的云影：
 // 云飘过时直射光（漫反射 + 高光）被遮住，只剩天光。
 export const cloudUniforms = {
   uTime: { value: 0 },

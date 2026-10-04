@@ -9,7 +9,7 @@ import { riverInfo } from './rivers.js';
 //  · 羊群总想聚到视线前方：每只羊在那团羊群里有自己的位置，视线转到哪儿就跟到哪儿
 //  · 吃草（低头、零星挪步）与赶路（走/小跑）之间切换；邻居都走了，自己也会跟上（从众）
 //  · 分离 / 对齐 / 聚合三种力，羊越多，对齐与聚合越强，自然挤成一团
-//  · 人走近时会让开，抬头看你
+//  · 人走近时会让开，偶尔抬头看人
 //  · 赶路时，偶尔有一只（或挨着的两三只）停下来啃几口草，落在后面，吃完再小跑着追上来；
 //    每只羊在羊群里的位置也在慢慢漂移——羊群在走的时候内部是流动的
 
@@ -208,7 +208,7 @@ export class Flock {
         } else {
           s.stepT -= dt;
           if (s.stepT < 0) {
-            // 走回来时是朝着人的；停下吃草后慢慢转开——多半侧身或背对着人，不一直盯着你看
+            // 走回来时朝着人；停下吃草后慢慢转开，多半侧身或背对着人
             const toCam = Math.atan2(cam.x - s.x, cam.z - s.z);
             const facing = Math.cos(wrapAngle(s.heading - toCam));   // 1 = 正对着人
             s.faceTo = s.heading;
@@ -321,7 +321,7 @@ export class Flock {
     s.legs[3].rotation.x = sw;
     s.tilt.position.y = Math.abs(Math.cos(s.phase)) * 0.045 * Math.min(speed / 2.5, 1);
 
-    // 头：吃草时低头啃，隔好一阵才抬头张望一下（人在附近时会顺便转头看你一眼）
+    // 头：吃草时低头啃，隔好一阵才抬头张望一下（人在附近时会顺便转头看人一眼）
     let tp, ty = 0;
     if (s.state === 'flock' && s.mode === 'nibble') {
       tp = 1.2 + 0.08 * Math.sin(time * 9 + s.id);

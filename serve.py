@@ -2,8 +2,8 @@
 """开发用静态服务器：每个响应都带 Cache-Control: no-store，浏览器永远拿到最新的文件。
 
 页面每次加载都会用 /v<时间戳>/src/... 这样的新路径去取脚本（见 index.html），
-这里把 /v<数字>/ 前缀去掉再找文件——这样即使浏览器里还留着以前缓存的旧脚本，也永远命中不到。
-开发面板里调的参数会 POST 到 /__tuning，存成项目根目录的 tuning.json（页面启动时读它当默认值）。
+这里把 /v<数字>/ 前缀去掉再找文件，浏览器里缓存过的脚本永远不会被命中。
+开发版面板里调的参数会 POST 到 /__tuning，存成项目根目录的 tuning.json（页面启动时读它当默认值）。
 
 用法：python3 serve.py [端口，默认 8000]
 """
@@ -65,7 +65,7 @@ def main():
     root = os.path.dirname(os.path.abspath(__file__))
     handler = functools.partial(NoCacheHandler, directory=root)
     with http.server.ThreadingHTTPServer(('', port), handler) as httpd:
-        print(f'伊犁 · 牧羊：http://localhost:{port}  （不缓存，Ctrl+C 停止）')
+        print(f'在伊犁草原放羊：http://localhost:{port}')
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>伊犁 · 牧羊</title>
+<title>在伊犁草原放羊</title>
 <style>
   html, body {
     margin: 0; height: 100%; overflow: hidden;
@@ -35,8 +35,7 @@
 <canvas id="c"></canvas>
 <div id="veil"></div>
 <script type="module">
-  // 开发期防缓存：每次加载都换一个路径前缀（serve.py 会把 /v<数字>/ 去掉），
-  // 浏览器里以前缓存的旧脚本永远命中不到。用别的静态服务器时自动退回普通路径。
+  // 防缓存：每次加载都换一个路径前缀（serve.py 会把 /v<数字>/ 去掉）；用别的静态服务器时退回普通路径
   const base = `./v${Date.now()}/`;
   const ok = await fetch(`${base}src/main.js`, { method: 'HEAD', cache: 'no-store' }).then((r) => r.ok).catch(() => false);
   await import(`${ok ? base : './'}src/main.js`);
