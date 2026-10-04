@@ -59,7 +59,8 @@
     "sheep": 0.8,
     "bees": 0.7,
     "birds": 0.5,
-    "music": 1.06
+    "music": 1.06,
+    "musicStyle": "kuy"
   },
-  "savedAt": 1791085598559
+  "savedAt": 1791111763063
 }

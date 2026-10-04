@@ -93,6 +93,7 @@ export const TUNING_DEFAULTS = {
     bees: 0.7,
     birds: 0.5,
     music: 0.8,
+    musicStyle: 'kuy',      // 'kuy' 冬不拉曲 / 'song' 草原小曲（长笛）
   },
 };
 

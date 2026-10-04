@@ -164,7 +164,10 @@ try {
 const flock = new Flock(scene, firstLook, obstacles);
 if (DEV) {
   const { createDevPanel } = await import('./devPanel.js');
-  createDevPanel(U, tuning, { onSheepStyle: (toon) => flock.look.setStyle?.(toon) });
+  createDevPanel(U, tuning, {
+    onSheepStyle: (toon) => flock.look.setStyle?.(toon),
+    onPlayMusic: () => { sound.start(); const m = sound.music; if (m) m.next = sound.ctx.currentTime + 0.3; },
+  });
 }
 
 const tmp = new THREE.Vector3();

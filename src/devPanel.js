@@ -5,7 +5,7 @@ import { saveTuning } from './tuning.js';
 // 开发版的调节面板（右上角，按 G 显示 / 隐藏）。
 // 每次改动都会存到浏览器和项目里的 tuning.json（需要用 serve.py 启动），下次打开就是调好的样子。
 
-export function createDevPanel(U, tuning, { onSheepStyle } = {}) {
+export function createDevPanel(U, tuning, { onSheepStyle, onPlayMusic } = {}) {
   const changed = () => {
     applyTuning(U, tuning);
     saveTuning(tuning);
@@ -89,6 +89,8 @@ export function createDevPanel(U, tuning, { onSheepStyle } = {}) {
   so.add(tuning.sound, 'bees', 0, 1.5, 0.01).name('熊蜂').onChange(changed);
   so.add(tuning.sound, 'birds', 0, 1.5, 0.01).name('云雀').onChange(changed);
   so.add(tuning.sound, 'music', 0, 1.5, 0.01).name('背景音乐').onChange(changed);
+  so.add(tuning.sound, 'musicStyle', { '冬不拉曲': 'kuy', '草原小曲（长笛）': 'song' }).name('音乐风格').onChange(changed);
+  if (onPlayMusic) so.add({ play: onPlayMusic }, 'play').name('立刻来一段音乐');
 
   // 预设：一键套用一组配好的参数（只改预设里列出的项，羊的参数不动）
   const presetNames = Object.keys(TUNING_PRESETS);

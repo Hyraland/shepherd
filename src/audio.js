@@ -1,6 +1,7 @@
 import { riverInfo, FLOW } from './rivers.js';
 import { heightAt } from './terrain.js';
-import { Music } from './music.js';
+import { KuyMusic } from './musicKuy.js';
+import { SongMusic } from './musicSong.js';
 
 // 草原的声音（Web Audio）。除了羊叫用录音，其余都是现场合成的：
 //   风    ：低沉的风声 + 草叶沙沙声，一阵阵起伏
@@ -9,7 +10,7 @@ import { Music } from './music.js';
 //           录音加载不了时退回合成的“咩——”
 //   熊蜂  ：离人最近的几只蜂的嗡嗡声，跟着蜂飞
 //   云雀  ：天上偶尔一段急促婉转的鸣唱
-//   音乐  ：现场生成的哈萨克风格小曲（冬不拉 + 长笛），一段之后安静很久，见 music.js
+//   音乐  ：现场生成的哈萨克音乐，一段之后安静很久。两种风格：冬不拉曲（musicKuy.js）、草原小曲（musicSong.js）
 // 浏览器要求用户先点一下 / 按一下键，声音才能开始。音量在开发面板「声音」里调。
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -30,6 +31,14 @@ export class Soundscape {
     try { localStorage.setItem('yili.music', on ? 'on' : 'off'); } catch {}
     // 重新打开时不用等很久，几秒后就来一段
     if (on && this.music && this.ctx) this.music.next = Math.min(this.music.next, this.ctx.currentTime + 3);
+  }
+
+  // 当前风格的音乐生成器（开发版面板里换风格时，几秒后就用新风格来一段）
+  get music() {
+    if (!this.musics) return null;
+    const m = this.musics[this.tuning.sound.musicStyle] || this.musics.kuy;
+    if (this._music && m !== this._music) m.next = Math.min(m.next, this.ctx.currentTime + 4);
+    return (this._music = m);
   }
 
   // 第一次点击 / 按键时调用
@@ -57,7 +66,7 @@ export class Soundscape {
     this.buildWater();
     this.buildBees();
     this.loadBleats();
-    this.music = new Music(ctx, this.bus.music, this.white);
+    this.musics = { kuy: new KuyMusic(ctx, this.bus.music), song: new SongMusic(ctx, this.bus.music, this.white) };
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) ctx.suspend(); else ctx.resume();
     });
@@ -393,8 +402,9 @@ export class Soundscape {
       set(v.g.gain, 0.22 * b.grow, 0.08);
     });
 
-    if (T.music > 0 && this.musicOn) this.music.update(now);
-    else this.music.next = Math.max(this.music.next, now + 5);
+    const music = this.music;
+    if (T.music > 0 && this.musicOn) music.update(now);
+    else music.next = Math.max(music.next, now + 5);
 
     // 云雀
     this.nextLark -= dt;
