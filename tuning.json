@@ -10,8 +10,8 @@
     "flowers": 0.45
   },
   "forest": {
-    "lit": "#7f886d",
-    "shade": "#454f6d"
+    "lit": "#dbe2a1",
+    "shade": "#4f6787"
   },
   "sheep": {
     "toon": true,
@@ -58,5 +58,5 @@
     "bees": 0.7,
     "birds": 0.5
   },
-  "savedAt": 1791081175471
+  "savedAt": 1791083631093
 }

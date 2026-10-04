@@ -8,7 +8,7 @@ import { treesForChunk, treeAssets } from './scenery.js';
 const SIZE = 256;
 const RADIUS = 1750;     // 地形区块铺到多远（再远是跟着人走的远景圈）
 const TREE_RADIUS = 1100;
-const TREE_DETAIL = 600; // 这以内用精细的云杉模型
+const TREE_DETAIL = 450; // 这以内用精细的云杉模型（枝片多，再远用简化版）
 const LODS = [[400, 64], [800, 32], [1300, 16], [Infinity, 8]]; // [距离以内, 每边分段数]
 
 export class World {

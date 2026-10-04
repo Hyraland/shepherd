@@ -5,71 +5,151 @@ import { fbm3Tex } from './noiseTexture.js';
 import { riverInfo, ACROSS } from './rivers.js';
 import { COMMON } from './shaders.js';
 
-// 天山云杉（雪岭云杉）：只会在 20 米开外被看到，所以按远观来做——
-// 细高的塔形树冠，一层层下垂的枝层，枝层边缘参差（枝梢），里深外浅、底面更暗，
-// 法线朝外上方（柔和的体积感，而不是一面面的平光）。
-// detail=false 是给 600 米以外用的简化版。
+// 天山云杉（雪岭云杉）：又细又高、像一根柱子，枝条短而下垂，树梢是一根细尖。
+// 每根枝条是两片交叉的“枝片”（贴一张带透明边的云杉枝贴图，见 branchTexture），一轮一轮绕着树干长，
+// 越往下的枝条垂得越厉害——轮廓是毛糙参差的枝梢，而不是一层层光滑的圆锥。
+// 光照用整棵树冠的“体积法线”（从树干往外、略朝上），朝阳的半边亮、背阳的半边暗，不会一片片切出暗面；
+// 顶点上的 aAo 是遮蔽：靠近树干、树冠下部更暗。aAo < 0 表示树干。
+// detail=false 是给 450 米以外用的简化版（更少的枝条，每根只有一片）。
 function spruceGeometry(detail) {
   const rng = mulberry32(detail ? 11 : 5);
-  const pos = [], nor = [], col = [];
-  const C = (hex) => new THREE.Color(hex);
-  const inner = C('#13241c'), under = C('#0e1a15'), tipA = C('#2c4b3a'), tipB = C('#3a5c45'), bark = C('#3d2c21');
-  const push = (p, n, c) => { pos.push(...p); nor.push(...n); col.push(c.r, c.g, c.b); };
-  const tri = (a, b, c) => { push(...a); push(...b); push(...c); };
-  const outward = (x, z, up) => { const l = Math.hypot(x, z, up); return [x / l, up / l, z / l]; };
+  const pos = [], nor = [], uv = [], ao = [];
+  const push = (p, n, t, o) => { pos.push(p[0], p[1], p[2]); nor.push(n[0], n[1], n[2]); uv.push(t[0], t[1]); ao.push(o); };
+  const quad = (a, b, c, d, n, ta, tb, tc, td, oa, ob, oc, od) => {
+    push(a, n, ta, oa); push(b, n, tb, ob); push(c, n, tc, oc);
+    push(a, n, ta, oa); push(c, n, tc, oc); push(d, n, td, od);
+  };
+  const add = (p, v, k) => [p[0] + v[0] * k, p[1] + v[1] * k, p[2] + v[2] * k];
+  const norm = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
+  const cross = (u, v) => [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
 
-  // 树干（只露出一小截）
-  const TS = 6;
+  // 树干：细细一根，从枝条的缝隙里透出来
+  const TS = 5;
   for (let i = 0; i < TS; i++) {
-    const a0 = (i / TS) * Math.PI * 2, a1 = ((i + 1) / TS) * Math.PI * 2, r = 0.02;
+    const a0 = (i / TS) * Math.PI * 2, a1 = ((i + 1) / TS) * Math.PI * 2, r = 0.008;
     const p0 = [Math.cos(a0) * r, 0, Math.sin(a0) * r], p1 = [Math.cos(a1) * r, 0, Math.sin(a1) * r];
-    const q0 = [p0[0], 0.14, p0[2]], q1 = [p1[0], 0.14, p1[2]];
-    const n0 = outward(Math.cos(a0), Math.sin(a0), 0), n1 = outward(Math.cos(a1), Math.sin(a1), 0);
-    tri([p0, n0, bark], [q0, n0, bark], [p1, n1, bark]);
-    tri([p1, n1, bark], [q0, n0, bark], [q1, n1, bark]);
+    const n = [Math.cos((a0 + a1) / 2), 0, Math.sin((a0 + a1) / 2)];
+    quad(p0, p1, [p1[0], 0.55, p1[2]], [p0[0], 0.55, p0[2]], n, [0, 0], [0, 0], [0, 0], [0, 0], -1, -1, -1, -1);
   }
 
-  // 树冠轮廓：窄而直，顶部收成尖
-  const R = (y) => 0.135 * Math.pow(Math.max(0, 1 - (y - 0.06) / 0.94), 0.72) + 0.006;
-  const N = detail ? 12 : 5;      // 枝层数
-  const M = detail ? 10 : 6;      // 每层的枝梢数
+  // 树冠轮廓：下半截几乎一样粗，往上收成细尖
+  const R = (t) => 0.125 * Math.pow(1 - t, 0.62) * (1 - 0.12 * t) + 0.006;
+  const N = detail ? 26 : 10;     // 枝条的轮数
+  const B = detail ? 9 : 5;       // 每轮的枝条数
+  let rot = rng() * Math.PI * 2;
   for (let k = 0; k < N; k++) {
-    const yb = 0.07 + (k / N) * 0.86;
-    const h = (0.86 / N) * (detail ? 1.9 : 1.6);   // 层与层互相叠住
-    const r0 = R(yb);
-    const rot = rng() * Math.PI * 2;
-    const shade = 0.85 + rng() * 0.3;
-    const apex = [0, yb + h, 0];
-    const ring = [];
-    for (let i = 0; i < M; i++) {
-      const a = rot + (i / M) * Math.PI * 2;
-      const tip = detail ? i % 2 === 0 : true;
-      const rr = r0 * (tip ? 1 + (rng() - 0.5) * 0.25 : 0.68);
-      const droop = tip ? 0.022 + rng() * 0.015 : -0.008;
-      const c = tipA.clone().lerp(tipB, rng()).multiplyScalar(tip ? shade : shade * 0.8);
-      ring.push({ p: [Math.cos(a) * rr, yb - droop, Math.sin(a) * rr], n: outward(Math.cos(a), Math.sin(a), 0.6), c });
-    }
-    const underC = [0, yb + h * 0.25, 0];
-    for (let i = 0; i < M; i++) {
-      const A = ring[i], B = ring[(i + 1) % M];
-      tri([apex, [0, 1, 0], inner], [B.p, B.n, B.c], [A.p, A.n, A.c]);
-      if (detail) tri([A.p, [A.n[0], -0.6, A.n[2]], under], [B.p, [B.n[0], -0.6, B.n[2]], under], [underC, [0, -1, 0], under]);
+    const t = (k + rng() * 0.6) / N;
+    const y = 0.07 + t * 0.86;
+    const nb = Math.max(3, Math.round(B * (1 - t * 0.45)));
+    rot += 2.39996;                 // 黄金角：上下两轮的枝条错开
+    for (let i = 0; i < nb; i++) {
+      const a = rot + ((i + (rng() - 0.5) * 0.6) / nb) * Math.PI * 2;
+      const reach = R(t) * (0.8 + rng() * 0.4);
+      // 越往下垂得越厉害（雪岭云杉的枝条像垂下来的帘子）
+      const droop = 0.22 + 0.42 * (1 - t) + (rng() - 0.5) * 0.2;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      const dir = norm([ca * Math.cos(droop), -Math.sin(droop), sa * Math.cos(droop)]);
+      const len = reach / Math.cos(droop);
+      const base = [ca * 0.01, y, sa * 0.01];
+      const tip = add(base, dir, len);
+      const tan = [-sa, 0, ca];
+      const vert = norm(cross(dir, tan));
+      const w = len * 0.6;
+      // 体积法线：从树干往外、略朝上（上部更朝上）
+      const n = norm([ca, 0.3 + 0.35 * t, sa]);
+      const aoBase = 0.42 + 0.25 * t, aoTip = 0.8 + 0.2 * t;
+      const sides = detail
+        ? [norm(add(tan, vert, 1)), norm(add(tan, vert, -1))]
+        : [norm(add(tan, vert, i % 2 ? 1 : -1))];
+      for (const sd of sides) {
+        quad(add(base, sd, -w * 0.5), add(tip, sd, -w * 0.5), add(tip, sd, w * 0.5), add(base, sd, w * 0.5), n,
+          [0, 0], [1, 0], [1, 1], [0, 1], aoBase, aoTip, aoTip, aoBase);
+      }
     }
   }
-  // 树梢
-  const top = 0.07 + 0.86 + 0.86 / N;
-  const tipC = tipB.clone().multiplyScalar(0.9);
-  for (let i = 0; i < 5; i++) {
-    const a0 = (i / 5) * Math.PI * 2, a1 = ((i + 1) / 5) * Math.PI * 2, r = 0.012;
-    tri([[0, 1.04, 0], [0, 1, 0], tipC],
-      [[Math.cos(a1) * r, top, Math.sin(a1) * r], outward(Math.cos(a1), Math.sin(a1), 0.4), tipC],
-      [[Math.cos(a0) * r, top, Math.sin(a0) * r], outward(Math.cos(a0), Math.sin(a0), 0.4), tipC]);
+  // 树梢：一根直立的细尖（两片交叉的窄枝片，贴图的枝梢朝上）
+  for (const sd of [[1, 0, 0], [0, 0, 1]]) {
+    const b0 = [0, 0.91, 0], b1 = [0, 1.03, 0], w = 0.009;
+    quad(add(b0, sd, -w), add(b1, sd, -w), add(b1, sd, w), add(b0, sd, w), [0, 0.6, 0.8],
+      [0.35, 0.15], [1, 0.3], [1, 0.75], [0.35, 0.85], 0.55, 0.7, 0.7, 0.55);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('aAo', new THREE.Float32BufferAttribute(ao, 1));
   return g;
+}
+
+// 云杉枝贴图（运行时用 canvas 画一次）：u 从树干（0）到枝梢（1），v 是枝片的宽度方向。
+// 中间一根主枝，沿着它长出一簇簇小枝：下侧的小枝长而下垂（像帘子），上侧的短而斜向前，
+// 每根小枝两边是密密的短针叶；小枝之间留着缝隙，所以整根枝条的轮廓是参差、透光的，不像一片叶子。
+// RGB 是明暗（下侧、靠近主枝更暗，朝上的一侧和枝梢更亮），A 是覆盖。
+function branchTexture() {
+  const W = 256, H = 128;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  const rng = mulberry32(77);
+  ctx.lineCap = 'round';
+  const X = (u) => 4 + u * (W - 12);
+  const yc = (u) => H * (0.4 + 0.08 * u * u);                  // 主枝略向下弯
+  const env = (u) => Math.pow(Math.sin(Math.PI * Math.min(1, u * 1.05 + 0.03)), 0.55) * (1 - 0.3 * u);
+  const gray = (b) => { const v = Math.round(Math.max(0, Math.min(1, b)) * 255); return `rgb(${v},${v},${v})`; };
+  const line = (x0, y0, x1, y1, b, w) => {
+    ctx.strokeStyle = gray(b); ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+  };
+  // 一根带针叶的小枝：从 (x, y) 朝 ang 方向长 len，途中慢慢下弯
+  const twig = (x, y, ang, len, curl, b0, b1) => {
+    let px = x, py = y, a = ang;
+    const steps = Math.max(3, Math.round(len / 2.2));
+    for (let i = 0; i < steps; i++) {
+      const f = i / steps;
+      const nx = px + Math.cos(a) * 2.2, ny = py + Math.sin(a) * 2.2;
+      line(px, py, nx, ny, b0 * 0.7, 1);
+      const nl = (2.4 + rng() * 1.8) * (1 - 0.35 * f);
+      const b = b0 + (b1 - b0) * f + (rng() - 0.5) * 0.12;
+      for (const sd of [-1, 1]) {
+        if (rng() < 0.15) continue;
+        const na = a + sd * (0.9 + rng() * 0.5) - 0.25;
+        line(nx, ny, nx + Math.cos(na) * nl, ny + Math.sin(na) * nl, b, 1 + rng() * 0.5);
+      }
+      px = nx; py = ny; a += curl;
+    }
+  };
+  // 主枝本身的针叶
+  for (let i = 0; i < 110; i++) {
+    const u = i / 110, x = X(u), y = yc(u);
+    for (const sd of [-1, 1]) {
+      const na = sd * (1.0 + rng() * 0.5) - 0.3;
+      const nl = 3 + rng() * 2;
+      line(x, y, x + Math.cos(na) * nl, y + Math.sin(na) * nl, 0.38 + 0.2 * u + (sd < 0 ? 0.1 : 0), 1.1);
+    }
+  }
+  // 下侧：长而下垂的小枝（帘子）
+  for (let i = 0; i < 30; i++) {
+    const u = 0.04 + (i + rng() * 0.8) / 30 * 0.92;
+    const e = env(u);
+    if (rng() < 0.12) continue;                      // 偶尔空一段，透光
+    const len = H * (0.22 + rng() * 0.28) * e;
+    twig(X(u), yc(u), 0.75 + rng() * 0.5, len, 0.025, 0.36 + 0.15 * u, 0.5 + 0.25 * u);
+  }
+  // 上侧：短而斜向前的小枝
+  for (let i = 0; i < 24; i++) {
+    const u = 0.06 + (i + rng() * 0.8) / 24 * 0.9;
+    const e = env(u);
+    if (rng() < 0.15) continue;
+    const len = H * (0.1 + rng() * 0.16) * e;
+    twig(X(u), yc(u), -0.55 - rng() * 0.45, len, 0.06, 0.55 + 0.15 * u, 0.8 + 0.2 * u);
+  }
+  // 枝梢：一小撮更亮的新芽
+  twig(X(0.97), yc(0.97), 0.1, 10, 0.02, 0.7, 0.95);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.anisotropy = 4;
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  return tex;
 }
 
 // 与 shaders.js 里的 forestMask 相同
@@ -87,18 +167,19 @@ export function treesForChunk(ci, cj, size, dense, material, geometry) {
   const items = [];
   for (let k = 0; k < candidates; k++) {
     const x = (ci + rng()) * size, z = (cj + rng()) * size;
-    const ht = 14 + rng() * 14, wd = ht * (0.85 + rng() * 0.3), rot = rng() * Math.PI * 2, tint = 0.85 + rng() * 0.3;
+    const ht = 14 + rng() * 16, wd = ht * (0.75 + rng() * 0.45), rot = rng() * Math.PI * 2, tint = 0.82 + rng() * 0.36;
+    const lx = (rng() - 0.5) * 0.06, lz = (rng() - 0.5) * 0.06;   // 有的树微微歪着
     if (forestMask(x, z) < 0.5) continue;
     if (riverInfo(x, z).d < 3) continue;
-    items.push({ x, z, ht, wd, rot, tint });
+    items.push({ x, z, ht, wd, rot, tint, lx, lz });
   }
   if (!items.length) return null;
   const mesh = new THREE.InstancedMesh(geometry, material, items.length);
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3();
   const col = new THREE.Color();
-  const up = new THREE.Vector3(0, 1, 0);
+  const e = new THREE.Euler();
   items.forEach((t, i) => {
-    q.setFromAxisAngle(up, t.rot);
+    q.setFromEuler(e.set(t.lx, t.rot, t.lz));
     sc.set(t.wd, t.ht, t.wd);
     p.set(t.x, heightAt(t.x, t.z) - 0.4, t.z);
     m.compose(p, q, sc);
@@ -111,42 +192,66 @@ export function treesForChunk(ci, cj, size, dense, material, geometry) {
   return mesh;
 }
 
-// 云杉的材质：和草地同一套二分色——亮面 / 暗面颜色由草地的颜色推出来（uForestLit / uForestShade），
-// 顶点色只留下明暗（里深外浅、底面更暗）；关掉二分色时是普通的写实光照
+// 云杉的材质：和草地同一套二分色——亮面 / 暗面颜色在面板“云杉林”里调（uForestLit / uForestShade），
+// 枝片贴图和 aAo 只给明暗；关掉二分色时是普通的写实光照。
+// 透明边用 alpha-to-coverage：远处贴图缩小时按 mip 级别把覆盖补回来，树不会越远越稀
 const treeVert = /* glsl */ `
+uniform float uTime;
+attribute float aAo;
 varying vec3 vN;
 varying vec3 vWorld;
-varying float vShade;
-varying vec3 vReal;
+varying vec2 vUv;
+varying float vAo;
+varying float vTint;
 void main() {
-  vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
+  vec3 p = position;
+  // 树冠上部随风轻轻晃
+  float id = float(gl_InstanceID);
+  float sw = p.y * p.y;
+  p.x += sin(uTime * 0.9 + id * 1.7) * 0.004 * sw;
+  p.z += cos(uTime * 0.7 + id * 2.3) * 0.003 * sw;
+  vec4 wp = modelMatrix * instanceMatrix * vec4(p, 1.0);
   vN = normalize(mat3(modelMatrix * instanceMatrix) * normal);
   vWorld = wp.xyz;
-  float tint = 1.0;
+  vUv = uv;
+  vAo = aAo;
+  vTint = 1.0;
 #ifdef USE_INSTANCING_COLOR
-  tint = instanceColor.r;
+  vTint = instanceColor.r;
 #endif
-  vReal = color * tint;
-  vShade = dot(color, vec3(0.2126, 0.7152, 0.0722)) / 0.075 * tint;
   gl_Position = projectionMatrix * viewMatrix * wp;
 }
 `;
 const treeFrag = /* glsl */ `
 ${COMMON}
+uniform sampler2D uBranch;
 varying vec3 vN;
 varying vec3 vWorld;
-varying float vShade;
-varying vec3 vReal;
+varying vec2 vUv;
+varying float vAo;
+varying float vTint;
 void main() {
+  float a = 1.0, b;
+  if (vAo < 0.0) {
+    b = 0.3;                                   // 树干
+  } else {
+    vec4 tx = texture2D(uBranch, vUv);
+    vec2 ts = vUv * vec2(256.0, 128.0);
+    float mip = max(0.0, 0.5 * log2(max(dot(dFdx(ts), dFdx(ts)), dot(dFdy(ts), dFdy(ts)))));
+    a = tx.a * (1.0 + mip * 0.3);
+    a = clamp((a - 0.45) / max(fwidth(a), 1e-4) + 0.5, 0.0, 1.0);
+    if (a < 0.01) discard;
+    b = tx.r * vAo;
+  }
+  float f = clamp(b * 1.5, 0.3, 1.3) * vTint;
   vec3 N = normalize(vN);
-  if (!gl_FrontFacing) N = -N;
   float cs = cloudShadow(vWorld.xz);
   float ss = sunShadow(vWorld + N * 0.3);
   float ndl = dot(N, uSunDir);
-  float k = smoothstep(0.3, 0.55, ss * clamp(ndl * 0.8 + 0.45, 0.0, 1.0)) * cs;
-  vec3 toon = mix(uForestShade, uForestLit, k) * clamp(vShade, 0.35, 1.5);
-  vec3 real = vReal * (ambient(N) + uSunColor * max(ndl, 0.0) * ss * cs);
-  gl_FragColor = vec4(applyFog(mix(real, toon, uToonMix), vWorld), 1.0);
+  float k = smoothstep(0.25, 0.6, ss * clamp(ndl * 0.8 + 0.45, 0.0, 1.0)) * cs;
+  vec3 toon = mix(uForestShade, uForestLit, k) * f;
+  vec3 real = vec3(0.07, 0.12, 0.085) * f * (ambient(N) + uSunColor * max(ndl, 0.0) * ss * cs);
+  gl_FragColor = vec4(applyFog(mix(real, toon, uToonMix), vWorld), a);
 }
 `;
 
@@ -155,7 +260,11 @@ export function treeAssets(U) {
   shared ||= {
     detailed: spruceGeometry(true),
     simple: spruceGeometry(false),
-    material: new THREE.ShaderMaterial({ uniforms: U, vertexShader: treeVert, fragmentShader: treeFrag, vertexColors: true, side: THREE.DoubleSide }),
+    material: new THREE.ShaderMaterial({
+      uniforms: { ...U, uBranch: { value: branchTexture() } },
+      vertexShader: treeVert, fragmentShader: treeFrag,
+      side: THREE.DoubleSide, alphaToCoverage: true,
+    }),
   };
   return shared;
 }
