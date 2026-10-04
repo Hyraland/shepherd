@@ -37,10 +37,12 @@ export function createDevPanel(U, tuning, { onSheepStyle } = {}) {
   g.add(tuning.grass, 'softness', 0, 0.3, 0.005).name('分界柔和度').onChange(changed);
   g.add(tuning.grass, 'variation', 0, 1, 0.01).name('深色的多少').onChange(changed);
   g.add(tuning.grass, 'flowers', 0, 1, 0.01).name('野花').onChange(changed);
+  g.add(tuning.grass, 'hues', 0, 1, 0.01).name('藏色（草叶里的杂色）').onChange(changed);
 
   const f = gui.addFolder('云杉林');
   f.addColor(tuning.forest, 'lit').name('亮面颜色').onChange(changed);
   f.addColor(tuning.forest, 'shade').name('暗面颜色').onChange(changed);
+  f.add(tuning.forest, 'hues', 0, 1, 0.01).name('藏色（枝条里的杂色）').onChange(changed);
 
   const s = gui.addFolder('羊');
   s.add(tuning.sheep, 'toon').name('插画光影（关 = 写实）').onChange((v) => { changed(); onSheepStyle?.(v); });
@@ -86,6 +88,7 @@ export function createDevPanel(U, tuning, { onSheepStyle } = {}) {
   so.add(tuning.sound, 'sheep', 0, 1.5, 0.01).name('羊叫').onChange(changed);
   so.add(tuning.sound, 'bees', 0, 1.5, 0.01).name('熊蜂').onChange(changed);
   so.add(tuning.sound, 'birds', 0, 1.5, 0.01).name('云雀').onChange(changed);
+  so.add(tuning.sound, 'music', 0, 1.5, 0.01).name('背景音乐').onChange(changed);
 
   // 预设：一键套用一组配好的参数（只改预设里列出的项，羊的参数不动）
   const presetNames = Object.keys(TUNING_PRESETS);

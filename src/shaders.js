@@ -118,6 +118,8 @@ uniform float uWaterRefl;
 uniform float uRipple;
 uniform float uGlitter;
 uniform float uFlowers;
+uniform float uGrassHues;   // 草叶里“藏”的杂色有多少（见 grass.js）
+uniform float uForestHues;  // 云杉枝片里藏的杂色（见 scenery.js）
 uniform float uSkyBand;
 uniform float uHazeLift;
 uniform float uExposure;

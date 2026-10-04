@@ -115,6 +115,21 @@ void main() {
   float lightT = ss * clamp(dot(normalize(mix(N, vec3(0.0, 1.0, 0.0), 0.65)), uSunDir) * 1.4, 0.0, 1.0);
   float vary = (h21(cell + vec2(9.0, 3.0)) - 0.5) * 2.0 + dry * 0.8;
   vec3 toon = toonGrass(lightT, cs, vary, t) * (1.0 + 0.15 * gust * t);
+  // 藏色（像油画里的草）：一部分草叶悄悄换成别的色相——亮面里是粉、橙、柠檬黄、薄荷青，
+  // 暗面里是紫、蓝、青、玫红；亮度和原来的草一样，只换色相，所以远看仍是一片和谐的绿。
+  // 杂色的多少随地块慢慢变化，越往叶尖越明显
+  float hp = fract(r1 * 3.97 + r2 * 11.31);
+  float region = vnoise(wxz * 0.07 + 21.0);
+  if (hp < uGrassHues * 0.55 * (0.4 + 1.2 * region)) {
+    float hr = fract(r1 * 17.13 + r2 * 5.71);
+    vec3 warm = hr < 0.25 ? vec3(1.0, 0.5, 0.6) : hr < 0.5 ? vec3(1.0, 0.62, 0.3) : hr < 0.75 ? vec3(0.95, 0.92, 0.35) : vec3(0.5, 0.95, 0.78);
+    vec3 cool = hr < 0.3 ? vec3(0.55, 0.42, 0.95) : hr < 0.6 ? vec3(0.32, 0.5, 1.0) : hr < 0.85 ? vec3(0.28, 0.78, 0.8) : vec3(0.85, 0.4, 0.8);
+    float litK = smoothstep(uToonEdge.x - 0.1, uToonEdge.x + 0.1, lightT) * cs;
+    vec3 hue = mix(cool, warm, litK);
+    const vec3 LUM = vec3(0.2126, 0.7152, 0.0722);
+    hue *= dot(toon, LUM) / max(dot(hue, LUM), 1e-3);
+    toon = mix(toon, hue, (0.35 + 0.45 * t) * min(1.0, uGrassHues * 1.5));
+  }
   col = mix(col, toon, uToonMix);
 
   vCol = applyFog(col, wp);

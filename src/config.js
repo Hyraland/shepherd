@@ -41,10 +41,12 @@ export const TUNING_DEFAULTS = {
     softness: 0.06,         // 分界的柔和度
     variation: 0.5,         // 每丛深浅、叶根到叶尖的变化
     flowers: 0.4,           // 野花的多少（0 = 没有）
+    hues: 0.55,             // 藏色：随机的草叶里藏着粉、橙、黄、青、紫（0 = 没有）
   },
   forest: {                 // 二分色的云杉林（近处的树和远处山坡上的林子），和草地的颜色分开调
     lit: '#65724d',         // 亮面
     shade: '#454f6d',       // 暗面
+    hues: 0.5,              // 藏色：一部分枝片换成别的色相（0 = 没有）
   },
   sheep: {
     toon: true,             // false = 写实材质
@@ -90,6 +92,7 @@ export const TUNING_DEFAULTS = {
     sheep: 0.8,
     bees: 0.7,
     birds: 0.5,
+    music: 0.8,
   },
 };
 
@@ -181,6 +184,8 @@ export function createSharedUniforms() {
     uRipple: { value: 1 },
     uGlitter: { value: 1 },
     uFlowers: { value: 0.4 },
+    uGrassHues: { value: 0.55 },
+    uForestHues: { value: 0.5 },
     uSkyBand: { value: 0.2 },
     uHazeLift: { value: 400 },
     uExposure: exposureUniform,
@@ -216,6 +221,7 @@ export function applyTuning(U, t) {
   // 云杉林：亮面 / 暗面单独调（默认值是原来从草地颜色推出来的那一对）
   screenColor(t.forest.lit, U.uForestLit.value);
   screenColor(t.forest.shade, U.uForestShade.value);
+  U.uForestHues.value = t.forest.hues;
 
   screenColor(s.light, U.uSheepLight.value);
   // 羊的暗面：按 followGrass 向草地暗面的色相靠拢（保持原来的亮度）
@@ -240,4 +246,5 @@ export function applyTuning(U, t) {
   U.uGlitter.value = w.glitter;
   U.uRiverGold.value.set(w.glitterColor);
   U.uFlowers.value = g.flowers;
+  U.uGrassHues.value = g.hues;
 }

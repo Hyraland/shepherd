@@ -13,9 +13,11 @@ import { COMMON } from './shaders.js';
 // detail=false 是给 450 米以外用的简化版（更少的枝条，每根只有一片）。
 function spruceGeometry(detail) {
   const rng = mulberry32(detail ? 11 : 5);
-  const pos = [], nor = [], uv = [], ao = [];
-  const push = (p, n, t, o) => { pos.push(p[0], p[1], p[2]); nor.push(n[0], n[1], n[2]); uv.push(t[0], t[1]); ao.push(o); };
+  const pos = [], nor = [], uv = [], ao = [], rnd = [];
+  let cardRand = 0;   // 每片枝片一个随机数（藏色用）
+  const push = (p, n, t, o) => { pos.push(p[0], p[1], p[2]); nor.push(n[0], n[1], n[2]); uv.push(t[0], t[1]); ao.push(o); rnd.push(cardRand); };
   const quad = (a, b, c, d, n, ta, tb, tc, td, oa, ob, oc, od) => {
+    cardRand = rng();
     push(a, n, ta, oa); push(b, n, tb, ob); push(c, n, tc, oc);
     push(a, n, ta, oa); push(c, n, tc, oc); push(d, n, td, od);
   };
@@ -78,6 +80,7 @@ function spruceGeometry(detail) {
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setAttribute('aAo', new THREE.Float32BufferAttribute(ao, 1));
+  g.setAttribute('aRand', new THREE.Float32BufferAttribute(rnd, 1));
   return g;
 }
 
@@ -198,6 +201,8 @@ export function treesForChunk(ci, cj, size, dense, material, geometry) {
 const treeVert = /* glsl */ `
 uniform float uTime;
 attribute float aAo;
+attribute float aRand;
+varying float vRand;
 varying vec3 vN;
 varying vec3 vWorld;
 varying vec2 vUv;
@@ -215,6 +220,7 @@ void main() {
   vWorld = wp.xyz;
   vUv = uv;
   vAo = aAo;
+  vRand = fract(aRand + float(gl_InstanceID) * 0.618034);
   vTint = 1.0;
 #ifdef USE_INSTANCING_COLOR
   vTint = instanceColor.r;
@@ -230,6 +236,7 @@ varying vec3 vWorld;
 varying vec2 vUv;
 varying float vAo;
 varying float vTint;
+varying float vRand;
 void main() {
   float a = 1.0, b;
   if (vAo < 0.0) {
@@ -250,6 +257,17 @@ void main() {
   float ndl = dot(N, uSunDir);
   float k = smoothstep(0.25, 0.6, ss * clamp(ndl * 0.8 + 0.45, 0.0, 1.0)) * cs;
   vec3 toon = mix(uForestShade, uForestLit, k) * f;
+  // 藏色（和草地一样）：一部分枝片悄悄换成别的色相——向阳的是赭黄、玫瑰、薄荷、柠檬，
+  // 背阳的是紫、蓝、青、梅红；亮度不变，远看仍是一片深绿的林子
+  if (vAo >= 0.0 && fract(vRand * 7.13) < uForestHues * 0.5) {
+    float hr = fract(vRand * 19.7);
+    vec3 warm = hr < 0.3 ? vec3(1.0, 0.72, 0.3) : hr < 0.55 ? vec3(1.0, 0.5, 0.55) : hr < 0.8 ? vec3(0.45, 0.95, 0.75) : vec3(0.95, 0.95, 0.4);
+    vec3 cool = hr < 0.3 ? vec3(0.55, 0.42, 0.95) : hr < 0.6 ? vec3(0.3, 0.48, 1.0) : hr < 0.85 ? vec3(0.25, 0.75, 0.8) : vec3(0.8, 0.38, 0.75);
+    vec3 hue = mix(cool, warm, k);
+    const vec3 LUM = vec3(0.2126, 0.7152, 0.0722);
+    hue *= dot(toon, LUM) / max(dot(hue, LUM), 1e-4);
+    toon = mix(toon, hue, (0.35 + 0.4 * clamp(b * 1.5, 0.0, 1.0)) * min(1.0, uForestHues * 1.5));
+  }
   vec3 real = vec3(0.07, 0.12, 0.085) * f * (ambient(N) + uSunColor * max(ndl, 0.0) * ss * cs);
   gl_FragColor = vec4(applyFog(mix(real, toon, uToonMix), vWorld), a);
 }

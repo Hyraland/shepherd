@@ -1,5 +1,6 @@
 import { riverInfo, FLOW } from './rivers.js';
 import { heightAt } from './terrain.js';
+import { Music } from './music.js';
 
 // 草原的声音，全部用 Web Audio 现场合成（不需要录音文件）：
 //   风    ：低沉的风声 + 草叶沙沙声，一阵阵起伏
@@ -8,6 +9,7 @@ import { heightAt } from './terrain.js';
 //           录音加载不了时退回合成的“咩——”
 //   熊蜂  ：离人最近的几只蜂的嗡嗡声，跟着蜂飞
 //   云雀  ：天上偶尔一段急促婉转的鸣唱
+//   音乐  ：现场生成的哈萨克风格小曲（冬不拉 + 长笛），一段之后安静很久，见 music.js
 // 浏览器要求用户先点一下 / 按一下键，声音才能开始。音量在开发面板「声音」里调。
 
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -33,7 +35,7 @@ export class Soundscape {
     this.master = ctx.createGain();
     this.master.connect(comp);
     this.bus = {};
-    for (const k of ['wind', 'water', 'sheep', 'bees', 'birds']) {
+    for (const k of ['wind', 'water', 'sheep', 'bees', 'birds', 'music']) {
       const g = ctx.createGain();
       g.gain.value = 0;
       g.connect(this.master);
@@ -46,6 +48,7 @@ export class Soundscape {
     this.buildWater();
     this.buildBees();
     this.loadBleats();
+    this.music = new Music(ctx, this.bus.music, this.white);
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) ctx.suspend(); else ctx.resume();
     });
@@ -380,6 +383,9 @@ export class Soundscape {
       set(v.o2.frequency, f * 1.018, 0.05);
       set(v.g.gain, 0.22 * b.grow, 0.08);
     });
+
+    if (T.music > 0) this.music.update(now);
+    else this.music.next = Math.max(this.music.next, now + 5);
 
     // 云雀
     this.nextLark -= dt;
