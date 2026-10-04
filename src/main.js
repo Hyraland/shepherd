@@ -17,9 +17,12 @@ import { SHEEP_LOOKS, loadLook, lookDef } from './sheepModels.js';
 import { Walker } from './walker.js';
 import { Post } from './post.js';
 import { cloudUniforms } from './materials.js';
-import { createDevPanel } from './devPanel.js';
 import { loadTuning, saveTuning } from './tuning.js';
+import { createMenu } from './ui.js';
 import { initSheepShading } from './sheepShader.js';
+
+// 开发版（dev.html）：有调节面板、切换小羊模型、调试入口；正式版（index.html）只有画面和右上角的菜单
+const DEV = window.YILI_DEV === true;
 
 await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 30)));
 
@@ -35,10 +38,10 @@ scene.fog = new THREE.FogExp2(PALETTE.fog, FOG_DENSITY);
 const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.05, 4000);
 
 const U = createSharedUniforms();
-// 可调参数：项目里的 tuning.json（+ 浏览器里还没写回的改动）；启动时写回一次，保证文件和画面一致
-const tuning = await loadTuning(TUNING_DEFAULTS);
+// 可调参数：项目里的 tuning.json。开发版还会读浏览器里还没写回的改动，并在启动时写回一次，保证文件和画面一致
+const tuning = await loadTuning(TUNING_DEFAULTS, { local: DEV });
 applyTuning(U, tuning);
-saveTuning(tuning);
+if (DEV) saveTuning(tuning);
 initSheepShading(U, tuning);
 
 // —— 光：太阳 + 天光；太阳的投影阴影跟着视线前方的一块区域走 ——
@@ -149,7 +152,7 @@ const readLookPref = () => {
   try { return localStorage.getItem(LOOK_KEY); } catch { return null; }
 };
 // 记住的选择可能已经被删掉了（比如以前的 1、2 号模型），对不上就用默认的第一个
-let lookId = lookDef(new URLSearchParams(location.search).get('sheep') || readLookPref()).id;
+let lookId = DEV ? lookDef(new URLSearchParams(location.search).get('sheep') || readLookPref()).id : SHEEP_LOOKS[0].id;
 let firstLook;
 try {
   firstLook = await loadLook(lookId, scene);
@@ -159,7 +162,10 @@ try {
   firstLook = await loadLook(lookId, scene);
 }
 const flock = new Flock(scene, firstLook, obstacles);
-createDevPanel(U, tuning, { onSheepStyle: (toon) => flock.look.setStyle?.(toon) });
+if (DEV) {
+  const { createDevPanel } = await import('./devPanel.js');
+  createDevPanel(U, tuning, { onSheepStyle: (toon) => flock.look.setStyle?.(toon) });
+}
 
 const tmp = new THREE.Vector3();
 const frustum = new THREE.Frustum();
@@ -341,21 +347,29 @@ function handleTap(x, y) {
 }
 
 addEventListener('keydown', (e) => {
+  if (e.target.closest?.('input, textarea, select')) return;   // 在面板里输入颜色时不算
   sound.start();
-  if (e.code === 'Space') {
+  if (['Equal', 'NumpadAdd', 'Enter', 'NumpadEnter'].includes(e.code) || e.key === '+' || e.key === '=') {
+    // 键盘版的“单击”：唤来一只羊
+    if (!e.repeat) addSheep();
+  } else if (['Minus', 'NumpadSubtract', 'Backspace', 'Delete'].includes(e.code) || e.key === '-' || e.key === '_' || e.key === '−') {
+    // 键盘版的“双击”：送走画面中间附近的那只（没有就送走最后来的那只）
+    e.preventDefault();
+    if (!e.repeat) removeSheep(innerWidth / 2, innerHeight / 2);
+  } else if (e.code === 'Space') {
     e.preventDefault();
     walker.walking = !walker.walking;
   } else if (e.code === 'ArrowLeft') walker.look(-0.12, 0);
   else if (e.code === 'ArrowRight') walker.look(0.12, 0);
   else if (e.code === 'ArrowUp') walker.look(0, -0.08);
   else if (e.code === 'ArrowDown') walker.look(0, 0.08);
-  else if (/^Digit[1-9]$/.test(e.code)) {
+  else if (DEV && /^Digit[1-9]$/.test(e.code)) {
     const def = SHEEP_LOOKS[Number(e.code.slice(5)) - 1];
     if (def) switchLook(def.id);
   } else if (e.code === 'KeyR') {
     walker.setMode(walker.mode === 'free' ? 'path' : 'free');
-    showDev(walker.mode === 'free' ? '自由漫步：往视线方向走' : '沿固定小路走');
-  } else if (e.code === 'KeyM') {
+    if (DEV) showDev(walker.mode === 'free' ? '自由漫步：往视线方向走' : '沿固定小路走');
+  } else if (DEV && e.code === 'KeyM') {
     const i = SHEEP_LOOKS.findIndex((d) => d.id === lookId);
     switchLook(SHEEP_LOOKS[(i + 1) % SHEEP_LOOKS.length].id);
   }
@@ -427,11 +441,13 @@ function frame() {
   if (first) {
     first = false;
     requestAnimationFrame(() => document.getElementById('veil').classList.add('gone'));
-    showDev(`${SHEEP_LOOKS.findIndex((d) => d.id === lookId) + 1} · ${SHEEP_LOOKS.find((d) => d.id === lookId).label}　（数字键 1–${SHEEP_LOOKS.length} / M 切换小羊模型）`);
+    if (DEV) showDev(`${SHEEP_LOOKS.findIndex((d) => d.id === lookId) + 1} · ${SHEEP_LOOKS.find((d) => d.id === lookId).label}　（数字键 1–${SHEEP_LOOKS.length} / M 切换小羊模型）`);
   }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
-// 调试入口（控制台里可用）
-window.__yili = { walker, flock, camera, addSheep, removeSheep, switchLook, U, sun, grassNear, grassMid, renderer, scene, post, world, horizon, lake, bees, sound };
+createMenu({ sound, maxSheep: MAX_SHEEP, right: DEV ? 262 : 14 });   // 开发版里让开调节面板
+
+// 调试入口（开发版的控制台里可用）
+if (DEV) window.__yili = { walker, flock, camera, addSheep, removeSheep, switchLook, U, sun, grassNear, grassMid, renderer, scene, post, world, horizon, lake, bees, sound };

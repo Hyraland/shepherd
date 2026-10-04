@@ -21,6 +21,15 @@ export class Soundscape {
     this.nextLark = rand(4, 10);
     this.lastBleat = 0;
     this.gust = 0;
+    // 背景音乐的开关（右上角菜单里切换，记在浏览器里；只管音乐，不影响自然声）
+    try { this.musicOn = localStorage.getItem('yili.music') !== 'off'; } catch { this.musicOn = true; }
+  }
+
+  setMusic(on) {
+    this.musicOn = on;
+    try { localStorage.setItem('yili.music', on ? 'on' : 'off'); } catch {}
+    // 重新打开时不用等很久，几秒后就来一段
+    if (on && this.music && this.ctx) this.music.next = Math.min(this.music.next, this.ctx.currentTime + 3);
   }
 
   // 第一次点击 / 按键时调用
@@ -309,7 +318,7 @@ export class Soundscape {
     const now = ctx.currentTime;
     const set = (param, v, tc = 0.15) => param.setTargetAtTime(v, now, tc);
     set(this.master.gain, T.master);
-    for (const k of Object.keys(this.bus)) set(this.bus[k].gain, T[k] ?? 0, 0.2);
+    for (const k of Object.keys(this.bus)) set(this.bus[k].gain, k === 'music' && !this.musicOn ? 0 : T[k] ?? 0, 0.2);
 
     // 听者跟着相机
     const L = ctx.listener;
@@ -384,7 +393,7 @@ export class Soundscape {
       set(v.g.gain, 0.22 * b.grow, 0.08);
     });
 
-    if (T.music > 0) this.music.update(now);
+    if (T.music > 0 && this.musicOn) this.music.update(now);
     else this.music.next = Math.max(this.music.next, now + 5);
 
     // 云雀

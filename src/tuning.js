@@ -4,7 +4,8 @@
 const LS_KEY = 'yili.tuning';
 const OLD_GRASS_KEY = 'yili.grassStyle';
 
-export async function loadTuning(defaults) {
+// local=false（正式版）：只用项目里的 tuning.json，不读浏览器里存过的开发改动
+export async function loadTuning(defaults, { local = true } = {}) {
   const merged = structuredClone(defaults);
   const mergeIn = (src) => {
     for (const group of Object.keys(merged)) if (src?.[group]) Object.assign(merged[group], src[group]);
@@ -17,11 +18,12 @@ export async function loadTuning(defaults) {
   mergeIn(fromFile);
   // 浏览器里有更新的改动（比如还没来得及写回文件）就以浏览器为准；
   // 也兼容上一版只存了草地参数的格式
+  if (!local) return merged;
   try {
-    const local = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+    const saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
     const oldGrass = JSON.parse(localStorage.getItem(OLD_GRASS_KEY) || 'null');
-    if (oldGrass && !local) mergeIn({ grass: oldGrass });
-    if (local && (!fromFile || (local.savedAt || 0) > (fromFile.savedAt || 0))) mergeIn(local);
+    if (oldGrass && !saved) mergeIn({ grass: oldGrass });
+    if (saved && (!fromFile || (saved.savedAt || 0) > (fromFile.savedAt || 0))) mergeIn(saved);
   } catch {}
   return merged;
 }

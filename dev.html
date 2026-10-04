@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>伊犁 · 牧羊</title>
+<title>伊犁 · 牧羊（开发版）</title>
 <style>
   html, body {
     margin: 0; height: 100%; overflow: hidden;
@@ -34,6 +34,10 @@
 <body>
 <canvas id="c"></canvas>
 <div id="veil"></div>
+<script>
+  // 开发版：调节面板（G 显示 / 隐藏）、数字键 1–3 / M 切换小羊模型、控制台里的 window.__yili
+  window.YILI_DEV = true;
+</script>
 <script type="module">
   // 开发期防缓存：每次加载都换一个路径前缀（serve.py 会把 /v<数字>/ 去掉），
   // 浏览器里以前缓存的旧脚本永远命中不到。用别的静态服务器时自动退回普通路径。
