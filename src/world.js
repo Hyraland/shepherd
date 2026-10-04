@@ -13,6 +13,7 @@ const LODS = [[400, 64], [800, 32], [1300, 16], [Infinity, 8]]; // [距离以内
 
 export class World {
   constructor(scene, U) {
+    this.U = U;
     this.material = makeTerrainMaterial(U);
     this.group = new THREE.Group();
     scene.add(this.group);
@@ -72,7 +73,7 @@ export class World {
       }
       if (w.wantTrees && (c.trees === undefined || c.treeDetail !== w.detail)) {
         if (c.trees) { this.group.remove(c.trees); c.trees.dispose(); }
-        const a = treeAssets();
+        const a = treeAssets(this.U);
         c.trees = treesForChunk(w.i, w.j, SIZE, w.dense, a.material, w.detail ? a.detailed : a.simple);
         c.treeDetail = w.detail;
         if (c.trees) this.group.add(c.trees);

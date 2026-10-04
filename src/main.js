@@ -1,12 +1,16 @@
 import * as THREE from 'three';
 import {
   SUN_DIR, PALETTE, MAX_SHEEP, START_SHEEP, FOG_DENSITY,
-  SUN_RADIANCE, SKY_RADIANCE, GROUND_RADIANCE, createSharedUniforms, TUNING_DEFAULTS, applyTuning,
+  SUN_RADIANCE, SKY_RADIANCE, GROUND_RADIANCE, createSharedUniforms, TUNING_DEFAULTS, applyTuning, WALK_SPEED,
 } from './config.js';
-import { createHorizon, heightAt } from './terrain.js';
+import { createHorizon, createLake, heightAt, LAKE } from './terrain.js';
+import { valleyTilt } from './noise.js';
+import { riverInfo, FLOW, ACROSS } from './rivers.js';
 import { createSky } from './sky.js';
 import { createGrass } from './grass.js';
 import { createFlowers } from './flowers.js';
+import { Bees } from './bees.js';
+import { Soundscape } from './audio.js';
 import { World } from './world.js';
 import { Flock } from './flock.js';
 import { SHEEP_LOOKS, loadLook, lookDef } from './sheepModels.js';
@@ -77,6 +81,8 @@ const sky = createSky(U);
 scene.add(sky);
 const horizon = createHorizon(U);
 scene.add(horizon);
+const lake = createLake(U);
+scene.add(lake);
 const world = new World(scene, U);
 
 const obstacles = world.obstacles;
@@ -87,14 +93,55 @@ const grassMid = createGrass(U, { count: coarse ? 110000 : 300000, size: 90, fad
 scene.add(grassNear, grassMid);
 const flowers = createFlowers(U, { count: coarse ? 3000 : 6500, size: 32 });
 scene.add(flowers);
+const bees = new Bees(scene, U, tuning, coarse ? 14 : 26);
+const sound = new Soundscape(tuning);
 
 // —— 人与羊 ——
 const walker = new Walker();
 walker.obstacles = obstacles;
+
+// 开场站在哪里：在出发点附近的谷底找一处面朝下游、越过眼前的草坡能望见湖的地方
+// （湖在太阳的方向，视线稍微偏开一点，免得一睁眼就对着太阳）。羊群就聚在面前。
+function findLakeView() {
+  const yaw0 = Math.atan2(-FLOW.x, -FLOW.z) + 0.3;
+  let best = null, bestScore = -1;
+  for (let u = -700; u <= 700; u += 35) {
+    for (const v of [-55, -20, 20, 55]) {
+      const x = u * FLOW.x + v * ACROSS.x, z = u * FLOW.z + v * ACROSS.z;
+      if (riverInfo(x, z).d < 5) continue;
+      const eye = heightAt(x, z) + 1.6;
+      const L = valleyTilt(u) + LAKE.level;
+      let score = 0;
+      for (let a = -0.45; a <= 0.451; a += 0.15) {
+        const dx = -Math.sin(yaw0 + a), dz = -Math.cos(yaw0 + a);
+        for (let dt = 500; dt <= 1700; dt += 60) {
+          const tx = x + dx * dt, tz = z + dz * dt;
+          if (heightAt(tx, tz) > L) continue;            // 那里不是湖面
+          let ok = true;
+          for (let d = 15; d < dt - 15; d += 12) {
+            if (heightAt(x + dx * d, z + dz * d) > eye + (L - eye) * (d / dt)) { ok = false; break; }
+          }
+          if (ok) score++;
+        }
+      }
+      score -= Math.abs(u) / 700;                          // 同样看得见，就选离出发点近的
+      if (score > bestScore) { bestScore = score; best = { x, z, yaw: yaw0 }; }
+    }
+  }
+  return best;
+}
+{
+  const spot = findLakeView();
+  if (spot) {
+    walker.x = spot.x; walker.z = spot.z;
+    walker.heading = walker.camYaw = walker.targetYaw = spot.yaw;
+  }
+}
 walker.update(0, camera);
 // 开场把人周围的地形一次性铺好
 world.update(camera.position, Infinity);
-horizon.userData.follow(camera.position.x, camera.position.z, heightAt(walker.x, walker.z));
+horizon.userData.follow(camera.position.x, camera.position.z);
+  lake.userData.follow(camera.position.x, camera.position.z);
 camera.updateMatrixWorld();
 
 const LOOK_KEY = 'yili.sheepLook';
@@ -128,7 +175,9 @@ function camForward() {
 // 羊群想聚在视线前方几步远的地方；视线转开时，它们会慢慢跟过去
 function updateHerdCenter(dt) {
   const f = walker.herdForward(tmp);
-  const D = 4.2 + flock.spread;
+  // 走着的时候羊群在前方几步远；停下来时就围拢到人身边
+  const moving = Math.min(1, walker.speed / WALK_SPEED);
+  const D = 2.2 + 0.55 * flock.spread + (2.0 + 0.45 * flock.spread) * moving;
   const tx = camera.position.x + f.x * D, tz = camera.position.z + f.z * D;
   const k = dt ? 1 - Math.exp(-dt * 1.2) : 1;
   herdCtx.cx += (tx - herdCtx.cx) * k;
@@ -251,6 +300,7 @@ let lastTap = { t: 0, x: 0, y: 0 };
 const DOUBLE_MS = 300;
 
 canvas.addEventListener('pointerdown', (e) => {
+  sound.start();
   down = { x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, t: performance.now(), moved: false, touch: e.pointerType === 'touch' };
   canvas.setPointerCapture(e.pointerId);
 });
@@ -291,6 +341,7 @@ function handleTap(x, y) {
 }
 
 addEventListener('keydown', (e) => {
+  sound.start();
   if (e.code === 'Space') {
     e.preventDefault();
     walker.walking = !walker.walking;
@@ -356,11 +407,14 @@ function frame() {
   U.uCenter.value.copy(camera.position);
   sky.position.copy(camera.position);
   world.update(camera.position, 4);
-  horizon.userData.follow(camera.position.x, camera.position.z, heightAt(walker.x, walker.z));
+  horizon.userData.follow(camera.position.x, camera.position.z);
+  lake.userData.follow(camera.position.x, camera.position.z);
 
   cloudUniforms.uSunView.value.copy(SUN_DIR).transformDirection(camera.matrixWorldInverse);
   updateHerdCenter(dt);
   flock.update(dt, time, herdCtx);
+  { const f = camForward(); bees.update(dt, time, camera.position, f.x, f.z); }
+  sound.update(dt, { camera, walker, flock, bees });
 
   followShadow(tmp.copy(camForward()).multiplyScalar(9).add(camera.position));
   post.render(renderer, scene, camera);
@@ -380,4 +434,4 @@ function frame() {
 requestAnimationFrame(frame);
 
 // 调试入口（控制台里可用）
-window.__yili = { walker, flock, camera, addSheep, removeSheep, switchLook, U, sun, grassNear, grassMid, renderer, scene, post, world, horizon };
+window.__yili = { walker, flock, camera, addSheep, removeSheep, switchLook, U, sun, grassNear, grassMid, renderer, scene, post, world, horizon, lake, bees, sound };

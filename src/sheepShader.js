@@ -13,10 +13,29 @@ export function initSheepShading(sharedUniforms, t) {
 }
 export const sheepToonEnabled = () => tuning?.sheep.toon ?? true;
 
+// 低头 / 转头：不是把头单独转开（那样脖子处会裂开），而是每个顶点按权重混合——
+// 从肩膀到头，权重从 0 平滑地升到 1，脖子一带被拉伸、弯曲，头和身体始终连在一起
+export const NECK_GLSL = /* glsl */ `
+vec3 neckBend(vec3 p, inout vec3 nrm, vec2 head, vec3 pivot, vec4 neck) {
+  float w = smoothstep(neck.x, neck.y, p.z) * smoothstep(neck.z, neck.w, p.y);
+  if (w <= 0.0) return p;
+  float cp = cos(head.x), sp = sin(head.x), cy = cos(head.y), sy = sin(head.y);
+  mat3 R = mat3(cy, 0.0, -sy, 0.0, 1.0, 0.0, sy, 0.0, cy) * mat3(1.0, 0.0, 0.0, 0.0, cp, sp, 0.0, -sp, cp);
+  nrm = normalize(mix(nrm, R * nrm, w));
+  return mix(p, R * (p - pivot) + pivot, w);
+}
+`;
+
 const vert = /* glsl */ `
 #ifdef GAIT
 attribute vec2 aGait;
 uniform float uHip;
+#endif
+#ifdef NECK
+attribute vec2 aHead;
+uniform vec3 uPivot;
+uniform vec4 uNeck;
+${NECK_GLSL}
 #endif
 varying vec2 vUv;
 varying vec3 vN;
@@ -25,6 +44,7 @@ varying float vTint;
 
 void main() {
   vec3 p = position;
+  vec3 nrm = normal;
 #ifdef GAIT
   {
     // 腿的摆动：髋部以下绕髋部高度的横轴转动，对角线两条腿同相
@@ -39,12 +59,15 @@ void main() {
     }
   }
 #endif
+#ifdef NECK
+  p = neckBend(p, nrm, aHead, uPivot, uNeck);
+#endif
   mat4 im = mat4(1.0);
 #ifdef USE_INSTANCING
   im = instanceMatrix;
 #endif
   vec4 wp = modelMatrix * im * vec4(p, 1.0);
-  vN = normalize(mat3(modelMatrix * im) * normal);
+  vN = normalize(mat3(modelMatrix * im) * nrm);
   vUv = uv;
   vWorld = wp.xyz;
 #ifdef USE_INSTANCING_COLOR
@@ -124,16 +147,19 @@ void main() {
 }
 `;
 
-export function makeSheepMaterial({ map, color, side, hip }) {
+export function makeSheepMaterial({ map, color, side, hip, neck }) {
   const defines = {};
   if (map) defines.HAS_MAP = '';
   if (hip != null) defines.GAIT = '';
+  if (neck) defines.NECK = '';
   return new THREE.ShaderMaterial({
     uniforms: {
       ...U,
       map: { value: map || null },
       uBaseColor: { value: (color || new THREE.Color(1, 1, 1)).clone() },
       uHip: { value: hip ?? 0 },
+      uPivot: { value: neck ? neck.pivot.clone() : new THREE.Vector3() },
+      uNeck: { value: neck ? neck.range.clone() : new THREE.Vector4() },
     },
     defines,
     vertexShader: vert,

@@ -77,6 +77,15 @@ export const TUNING_DEFAULTS = {
     ripple: 1.0,            // 波纹的细碎程度
     glitter: 1.0,           // 阳光闪光的强度
     glitterColor: '#ffe2a8',// 闪光的颜色（远处朝太阳的河段会泛这个颜色）
+    lake: '#2f6fae',        // 远处湖水的颜色（再叠上天空倒影和金色的碎光）
+  },
+  sound: {                  // 音量（0 = 静音）
+    master: 0.8,
+    wind: 0.19,
+    water: 0.8,
+    sheep: 0.8,
+    bees: 0.7,
+    birds: 0.5,
   },
 };
 
@@ -88,7 +97,7 @@ export const TUNING_PRESETS = {
       elevation: 24, azimuth: 0, sun: 2.4, skyLight: 0.6, zenith: '#2a66bd', horizon: '#c2d8ee',
       band: 0.32, haze: 0.55, exposure: 1.15, bloom: 0.35,
     },
-    water: { color: '#1d3a44', reflection: 0.85, ripple: 1.0, glitter: 1.0, glitterColor: '#ffe2a8' },
+    water: { color: '#1d3a44', reflection: 0.85, ripple: 1.0, glitter: 1.0, glitterColor: '#ffe2a8', lake: '#2f6fae' },
   },
   '我上一版调的': {
     grass: { toon: true, light: '#c7ea66', lightDeep: '#4c66a4', shadow: '#5c69a3', edge: 0.05, softness: 0.045, variation: 0.35, flowers: 0 },
@@ -139,6 +148,8 @@ export function createSharedUniforms() {
     uSnow: { value: c('#f4f7ff') },
     uAlpine: { value: c('#64804c') },
     uForest: { value: c('#22352b') },
+    uForestLit: { value: new THREE.Color() },   // 二分色的云杉：亮面 / 暗面（由草地的颜色推出来，见 applyTuning）
+    uForestShade: { value: new THREE.Color() },
     uZenith: { value: c(PALETTE.zenith) },
     uShadowMap: { value: null },
     uShadowMatrix: { value: new THREE.Matrix4() },
@@ -161,6 +172,7 @@ export function createSharedUniforms() {
     uSheepHi: { value: 0.3 },
     uCloud: cloudUniform,
     uWaterColor: { value: new THREE.Color() },
+    uLakeColor: { value: new THREE.Color() },
     uWaterRefl: { value: 0.85 },
     uRipple: { value: 1 },
     uGlitter: { value: 1 },
@@ -197,6 +209,9 @@ export function applyTuning(U, t) {
   screenColor(g.shadow, U.uToonShadow.value);
   U.uToonEdge.value.set(g.edge, g.softness);
   U.uToonVar.value = g.variation;
+  // 云杉林和草地同一套色系：亮面是压暗、稍偏冷的“亮面深色”，暗面是压暗的草地暗面
+  U.uForestLit.value.copy(U.uToonLightDeep.value).lerp(U.uToonShadow.value, 0.25).multiplyScalar(0.7);
+  U.uForestShade.value.copy(U.uToonShadow.value).multiplyScalar(0.58);
 
   screenColor(s.light, U.uSheepLight.value);
   // 羊的暗面：按 followGrass 向草地暗面的色相靠拢（保持原来的亮度）
@@ -215,6 +230,7 @@ export function applyTuning(U, t) {
   U.uSheepHi.value = s.highlight;
 
   screenColor(w.color, U.uWaterColor.value);
+  screenColor(w.lake, U.uLakeColor.value);
   U.uWaterRefl.value = w.reflection;
   U.uRipple.value = w.ripple;
   U.uGlitter.value = w.glitter;

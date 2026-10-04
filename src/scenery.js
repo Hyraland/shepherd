@@ -3,7 +3,7 @@ import { heightAt } from './terrain.js';
 import { mulberry32, smoothstep } from './noise.js';
 import { fbm3Tex } from './noiseTexture.js';
 import { riverInfo, ACROSS } from './rivers.js';
-import { standard } from './materials.js';
+import { COMMON } from './shaders.js';
 
 // 天山云杉（雪岭云杉）：只会在 20 米开外被看到，所以按远观来做——
 // 细高的塔形树冠，一层层下垂的枝层，枝层边缘参差（枝梢），里深外浅、底面更暗，
@@ -111,12 +111,51 @@ export function treesForChunk(ci, cj, size, dense, material, geometry) {
   return mesh;
 }
 
+// 云杉的材质：和草地同一套二分色——亮面 / 暗面颜色由草地的颜色推出来（uForestLit / uForestShade），
+// 顶点色只留下明暗（里深外浅、底面更暗）；关掉二分色时是普通的写实光照
+const treeVert = /* glsl */ `
+varying vec3 vN;
+varying vec3 vWorld;
+varying float vShade;
+varying vec3 vReal;
+void main() {
+  vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
+  vN = normalize(mat3(modelMatrix * instanceMatrix) * normal);
+  vWorld = wp.xyz;
+  float tint = 1.0;
+#ifdef USE_INSTANCING_COLOR
+  tint = instanceColor.r;
+#endif
+  vReal = color * tint;
+  vShade = dot(color, vec3(0.2126, 0.7152, 0.0722)) / 0.075 * tint;
+  gl_Position = projectionMatrix * viewMatrix * wp;
+}
+`;
+const treeFrag = /* glsl */ `
+${COMMON}
+varying vec3 vN;
+varying vec3 vWorld;
+varying float vShade;
+varying vec3 vReal;
+void main() {
+  vec3 N = normalize(vN);
+  if (!gl_FrontFacing) N = -N;
+  float cs = cloudShadow(vWorld.xz);
+  float ss = sunShadow(vWorld + N * 0.3);
+  float ndl = dot(N, uSunDir);
+  float k = smoothstep(0.3, 0.55, ss * clamp(ndl * 0.8 + 0.45, 0.0, 1.0)) * cs;
+  vec3 toon = mix(uForestShade, uForestLit, k) * clamp(vShade, 0.35, 1.5);
+  vec3 real = vReal * (ambient(N) + uSunColor * max(ndl, 0.0) * ss * cs);
+  gl_FragColor = vec4(applyFog(mix(real, toon, uToonMix), vWorld), 1.0);
+}
+`;
+
 let shared = null;
-export function treeAssets() {
+export function treeAssets(U) {
   shared ||= {
     detailed: spruceGeometry(true),
     simple: spruceGeometry(false),
-    material: standard({ vertexColors: true, roughness: 0.95 }),
+    material: new THREE.ShaderMaterial({ uniforms: U, vertexShader: treeVert, fragmentShader: treeFrag, vertexColors: true, side: THREE.DoubleSide }),
   };
   return shared;
 }

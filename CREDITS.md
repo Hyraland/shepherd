@@ -24,6 +24,16 @@
   - **不要把 models/sheep_cgtrader/ 和原始 zip 提交到公开仓库**；
   - 公开发布前，需要把模型和贴图打包成加密的二进制、在页面里解密加载（而不是直接放 Sheep.gltf / PNG）。
 
+## 声音：assets/sounds（羊叫）
+
+- `sheep_baa.ogg` — "Sheep Baa" by AntumDeluge（from a recording by mikewest），**CC0**（无需署名）— https://opengameart.org/node/132779
+- `sheep1.flac`、`sheepBleet.flac`、`sheep2.flac` — "Sheep Sound Bleats (Yo Frankie!)" by Blender Foundation（submitted by Lamoot），
+  **CC-BY 3.0**（允许商用，须署名）— https://opengameart.org/content/sheep-sound-bleats-yo-frankie
+  对外发布时请在页面可见处署名：Sheep sounds from "Yo Frankie!" © Blender Foundation, CC-BY 3.0。
+  本项目只在播放时改变了音高（按每只羊的体型）。
+
+其余声音（风、溪水、熊蜂、云雀）都在浏览器里现场合成，没有用到外部素材。
+
 ## 已不再使用
 
 - "Sheep animation lowpoly" by EREMA_GEP（CC BY 4.0）——已从模型选项中移除，文件仍在 models/ 下。

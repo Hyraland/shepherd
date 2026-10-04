@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SHEEP_CAPACITY } from './sheep.js';
 import { withClouds } from './materials.js';
-import { makeSheepMaterial, sheepToonEnabled } from './sheepShader.js';
+import { makeSheepMaterial, sheepToonEnabled, NECK_GLSL } from './sheepShader.js';
 
 // 开发阶段用来对比的几种小羊外观（授权见 CREDITS.md；1 号是 CGTrader 版税授权，公开发布前需要加密打包）。
 // 都是不带骨骼的静态模型：腿在顶点着色器里按步伐摆动，头部（分开的部件）绕脖子转动。
@@ -98,14 +98,26 @@ const inGroup = (o, names) => {
   return false;
 };
 
-// 腿的摆动：髋部以下的顶点绕髋部高度的横轴转动；对角线上的两条腿同相（小跑步态）
-function withGait(material, hipY) {
+// 写实材质也要和插画材质一样动：腿按步伐摆（髋部以下的顶点绕髋部高度的横轴转动，对角线两条腿同相），
+// 脖子按权重弯曲（见 sheepShader.js 的 neckBend）
+function withRig(material, hipY, neck) {
   material.onBeforeCompile = (sh) => {
-    sh.vertexShader = 'attribute vec2 aGait;\n' + sh.vertexShader.replace(
-      '#include <begin_vertex>',
-      /* glsl */ `#include <begin_vertex>
-      {
-        float hip = ${hipY.toFixed(4)};
+    let head = '';
+    if (hipY != null) head += 'attribute vec2 aGait;\n';
+    if (neck) {
+      sh.uniforms.uPivot = { value: neck.pivot };
+      sh.uniforms.uNeck = { value: neck.range };
+      head += 'attribute vec2 aHead;\nuniform vec3 uPivot;\nuniform vec4 uNeck;\n' + NECK_GLSL;
+    }
+    sh.vertexShader = head + sh.vertexShader
+      // 法线在位置之前就算了：在这里一起把脖子弯好，位置留到 begin_vertex 再用
+      .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
+      vec3 rigPos = position;
+      ${neck ? 'rigPos = neckBend(position, objectNormal, aHead, uPivot, uNeck);' : ''}`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+      transformed = rigPos;
+      ${hipY != null ? `{
+        float hip = ${(hipY ?? 0).toFixed(4)};
         float w = smoothstep(hip, hip - 0.12, transformed.y);
         if (w > 0.0 && aGait.y > 0.0) {
           bool front = transformed.z > 0.0;
@@ -115,10 +127,9 @@ function withGait(material, hipY) {
           transformed.y = hip + dy * cos(a);
           transformed.z += dy * sin(a);
         }
-      }`
-    );
+      }` : ''}`);
   };
-  material.customProgramCacheKey = () => 'gait' + hipY.toFixed(4);
+  material.customProgramCacheKey = () => `rig${hipY ?? '-'}|${neck ? 'neck' : ''}`;
   return material;
 }
 
@@ -153,7 +164,14 @@ async function buildTemplate(def) {
   const pivot = headBox.isEmpty()
     ? new THREE.Vector3()
     : new THREE.Vector3(0, headBox.min.y + (headBox.max.y - headBox.min.y) * 0.35, headBox.min.z + (headBox.max.z - headBox.min.z) * 0.15);
-  return { parts, pivot };
+  // 脖子弯曲的范围（模型坐标）：沿前后方向从肩膀后面到脸，沿高度从胸口以上；
+  // 头部件和身体用同一个权重，接缝两边的顶点动得一样，就不会裂开
+  const H = def.height;
+  const neck = headBox.isEmpty() ? null : {
+    pivot,
+    range: new THREE.Vector4(pivot.z - 0.15 * H, pivot.z + 0.12 * H, pivot.y - 0.27 * H, pivot.y - 0.13 * H),
+  };
+  return { parts, pivot, neck };
 }
 
 export async function loadLook(id, scene) {
@@ -175,18 +193,19 @@ class ModelLook {
     this.scene = scene;
     this.def = def;
     this.pivot = data.pivot;
+    this.neck = data.neck;
     const toon = sheepToonEnabled();
     this.meshes = data.parts.map(({ geo, mat, isHead }) => {
       const g = geo.clone();
       const m = mat.clone();
       const hip = !isHead && def.hip ? def.hip * def.height : null;
-      if (hip != null) {
-        g.setAttribute('aGait', new THREE.InstancedBufferAttribute(new Float32Array(SHEEP_CAPACITY * 2), 2));
-        withGait(m, hip);
-      }
+      const neck = data.neck;
+      if (hip != null) g.setAttribute('aGait', new THREE.InstancedBufferAttribute(new Float32Array(SHEEP_CAPACITY * 2), 2));
+      if (neck) g.setAttribute('aHead', new THREE.InstancedBufferAttribute(new Float32Array(SHEEP_CAPACITY * 2), 2));
+      if (hip != null || neck) withRig(m, hip, neck);
       withClouds(m);
       // 两套材质：写实（PBR）和插画光影，开发面板里切换
-      const toonMat = makeSheepMaterial({ map: mat.map, color: mat.color, side: mat.side, hip });
+      const toonMat = makeSheepMaterial({ map: mat.map, color: mat.color, side: mat.side, hip, neck });
       const mesh = new THREE.InstancedMesh(g, toon ? toonMat : m, SHEEP_CAPACITY);
       mesh.userData.materials = { real: m, toon: toonMat };
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -218,17 +237,22 @@ class ModelLook {
       const roll = Math.sin(s.phase) * 0.035 * Math.min(speed / 1.5, 1);
       _m2.makeRotationFromEuler(_e.set(graze * 0.06, 0, roll));
       _m.multiplyMatrices(s.tilt.matrixWorld, _m2);
-      // 头：绕脖子低头吃草、转头张望
-      _m3.makeTranslation(p.x, p.y, p.z)
-        .multiply(_m2.makeRotationFromEuler(_e.set(Math.min(graze, 1.2) * 0.55 - 0.05, s.yaw * 0.8, 0)))
-        .multiply(_t.makeTranslation(-p.x, -p.y, -p.z));
-      _m3.premultiply(_m);
+      // 头：绕脖子低头吃草、转头张望（有脖子权重时在着色器里弯；没有的模型才把头部件整块转开）
+      const hp = Math.min(graze, 1.2) * 0.55 - 0.05, hy = s.yaw * 0.8;
+      if (!this.neck) {
+        _m3.makeTranslation(p.x, p.y, p.z)
+          .multiply(_m2.makeRotationFromEuler(_e.set(hp, hy, 0)))
+          .multiply(_t.makeTranslation(-p.x, -p.y, -p.z));
+        _m3.premultiply(_m);
+      }
       const amp = Math.min(speed / 1.3, 1) * (speed > 2.4 ? 0.6 : 0.42);
       for (const mesh of this.meshes) {
-        mesh.setMatrixAt(i, mesh.userData.isHead ? _m3 : _m);
+        mesh.setMatrixAt(i, mesh.userData.isHead && !this.neck ? _m3 : _m);
         mesh.setColorAt(i, _c.setScalar(s.tint));
         const gait = mesh.geometry.attributes.aGait;
         if (gait) { gait.array[i * 2] = s.phase; gait.array[i * 2 + 1] = amp; }
+        const head = mesh.geometry.attributes.aHead;
+        if (head) { head.array[i * 2] = hp; head.array[i * 2 + 1] = hy; }
       }
       this.owners[i] = s;
     }
@@ -238,6 +262,7 @@ class ModelLook {
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
       if (mesh.geometry.attributes.aGait) mesh.geometry.attributes.aGait.needsUpdate = true;
+      if (mesh.geometry.attributes.aHead) mesh.geometry.attributes.aHead.needsUpdate = true;
     }
   }
 

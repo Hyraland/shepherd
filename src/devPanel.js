@@ -67,12 +67,21 @@ export function createDevPanel(U, tuning, { onSheepStyle } = {}) {
   k.add(tuning.sky, 'cloudSoftness', 0, 1, 0.01).name('云影边缘柔和').onChange(changed);
   k.add(tuning.sky, 'cloudSpeed', 0, 4, 0.05).name('云飘动速度').onChange(changed);
 
-  const w = gui.addFolder('溪流');
+  const w = gui.addFolder('溪流与湖');
   w.addColor(tuning.water, 'color').name('水色').onChange(changed);
   w.add(tuning.water, 'reflection', 0, 1, 0.01).name('天空倒影').onChange(changed);
   w.add(tuning.water, 'ripple', 0.3, 2.5, 0.01).name('波纹细碎').onChange(changed);
   w.add(tuning.water, 'glitter', 0, 3, 0.01).name('阳光闪光').onChange(changed);
   w.addColor(tuning.water, 'glitterColor').name('远处闪光颜色').onChange(changed);
+  w.addColor(tuning.water, 'lake').name('湖水颜色').onChange(changed);
+
+  const so = gui.addFolder('声音（点一下画面后开始）');
+  so.add(tuning.sound, 'master', 0, 1.5, 0.01).name('总音量').onChange(changed);
+  so.add(tuning.sound, 'wind', 0, 1.5, 0.01).name('风和草').onChange(changed);
+  so.add(tuning.sound, 'water', 0, 1.5, 0.01).name('溪水').onChange(changed);
+  so.add(tuning.sound, 'sheep', 0, 1.5, 0.01).name('羊叫').onChange(changed);
+  so.add(tuning.sound, 'bees', 0, 1.5, 0.01).name('熊蜂').onChange(changed);
+  so.add(tuning.sound, 'birds', 0, 1.5, 0.01).name('云雀').onChange(changed);
 
   // 预设：一键套用一组配好的参数（只改预设里列出的项，羊的参数不动）
   const presetNames = Object.keys(TUNING_PRESETS);

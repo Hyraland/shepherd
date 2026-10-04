@@ -9,6 +9,25 @@ float vnoise(vec2 p) {
   return texture(uNoise, p * (1.0 / 32.0)).r;
 }
 
+// 带导数的梯度噪声（每个格点一个随机方向，取自噪声纹理里的格点值），返回 (值, ∂/∂x, ∂/∂y)。
+// 导数处处连续，而且不像值噪声那样在每个格点都是平的——用来算水面波纹的法线时，
+// 太阳的高光是一粒粒不规则的碎光，不会排成一格一格的方块
+vec2 ngrad(vec2 c) {
+  ivec2 t = ivec2(mod(c, 32.0)) * 8;
+  float a = texelFetch(uNoise, t, 0).r * 6.2831853;
+  return vec2(cos(a), sin(a));
+}
+vec3 gnoiseD(vec2 p) {
+  vec2 i = floor(p), f = p - i;
+  vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+  vec2 du = 30.0 * f * f * (f * (f - 2.0) + 1.0);
+  vec2 ga = ngrad(i), gb = ngrad(i + vec2(1.0, 0.0)), gc = ngrad(i + vec2(0.0, 1.0)), gd = ngrad(i + vec2(1.0, 1.0));
+  float va = dot(ga, f), vb = dot(gb, f - vec2(1.0, 0.0)), vc = dot(gc, f - vec2(0.0, 1.0)), vd = dot(gd, f - vec2(1.0, 1.0));
+  float k = va - vb - vc + vd;
+  return vec3(va + u.x * (vb - va) + u.y * (vc - va) + u.x * u.y * k,
+              ga + u.x * (gb - ga) + u.y * (gc - ga) + u.x * u.y * (ga - gb - gc + gd) + du * (u.yx * k + vec2(vb, vc) - va));
+}
+
 float fbm3(vec2 p) {
   float s = 0.0;
   float a = 0.5;
@@ -82,6 +101,8 @@ uniform vec3 uTransl;
 uniform vec2 uWind;
 uniform vec3 uZenith;
 uniform vec3 uForest;
+uniform vec3 uForestLit;
+uniform vec3 uForestShade;
 uniform sampler2D uShadowMap;
 uniform mat4 uShadowMatrix;
 uniform float uShadowOn;
@@ -139,7 +160,17 @@ float forestMask(vec2 p, float across) {
   return smoothstep(0.5, 0.56, n + hills * 0.08 - (1.0 - hills) * 0.06) * smoothstep(170.0, 190.0, abs(across));
 }
 
-// 阵风：一团团更强的风顺着风向扫过草地，形状在移动中慢慢变化（不是同心的涟漪）
+// 远处（没有种树的地方）的林地：边缘放宽、再用噪声打散，像一片片参差的林缘，而不是刀切的色块
+float forestMaskFar(vec2 p, float across, float soft, float h) {
+  float hills = smoothstep(170.0, 320.0, abs(across));
+  float n = fbm3(p * 0.006 + vec2(11.0, 3.0)) + (vnoise(p * 0.035 + 2.7) - 0.5) * 0.12 * soft + (vnoise(p * 0.11) - 0.5) * 0.05 * soft;
+  // 谷底中间不长树的那条带子只管低处的谷底；到了山坡上（比如河谷尽头的山）就不再有这条限制，否则会竖着留出一条空带
+  float open = max(smoothstep(170.0, 190.0 + 60.0 * soft, abs(across)), smoothstep(30.0, 120.0, h));
+  float valley = max(hills, smoothstep(30.0, 120.0, h));
+  return smoothstep(0.5 - 0.04 * soft, 0.56 + 0.04 * soft, n + valley * 0.08 - (1.0 - valley) * 0.06) * open;
+}
+
+// 阵风：一团团顺风飘过的强风区（草被压弯、反光变亮）
 float gustAt(vec2 p) {
   vec2 q = p - uWind * uTime * 4.5;
   float g1 = vnoise(q * 0.045 + vec2(0.0, uTime * 0.06));
@@ -188,12 +219,16 @@ float sunShadowFast(vec3 wp) {
 //   light 是 0–1 的受光量（朝向 × 投影，不含云），按分界线切成亮面 / 暗面；
 //   cloud 是云影剩下的阳光（1 = 没有云）：云影不是一刀切的暗面，而是介于亮暗之间的一层；
 //   亮面里的叶根和深一些的草丛用「亮面深色」，vary 是局部深浅（-1–1），root 是叶根到叶尖（0–1）
-vec3 toonGrass(float light, float cloud, float vary, float root) {
-  float k = smoothstep(uToonEdge.x - uToonEdge.y, uToonEdge.x + uToonEdge.y, light) * cloud;
+// soft：明暗分界的柔和度（近处就是面板里的值；远山上会放宽，见 terrain.js）
+vec3 toonGrassSoft(float light, float cloud, float vary, float root, float soft) {
+  float k = smoothstep(uToonEdge.x - soft, uToonEdge.x + soft, light) * cloud;
   float deep = clamp((1.0 - root) * 0.9 - vary * 0.45, 0.0, 1.0) * uToonVar * 1.6;
   vec3 lit = mix(uToonLight, uToonLightDeep, clamp(deep, 0.0, 1.0));
   vec3 shade = uToonShadow * (1.0 + uToonVar * (vary * 0.3 + (root - 1.0) * 0.45));
   return mix(shade, lit, k);
+}
+vec3 toonGrass(float light, float cloud, float vary, float root) {
+  return toonGrassSoft(light, cloud, vary, root, uToonEdge.y);
 }
 
 // 天空的颜色（天空球和水面倒影共用）：地平线上一窄条浅色，往上很快变成深蓝；
@@ -213,10 +248,10 @@ vec3 fl_hash3(vec2 p) {
   return fract((q.xxy + q.yzz) * q.zyx);
 }
 vec3 flowerColor(float hue) {
-  return hue < 0.46 ? vec3(0.9, 0.62, 0.06)          // 黄：毛茛、蒲公英
-       : hue < 0.62 ? vec3(0.88, 0.88, 0.82)         // 白：雏菊
-       : hue < 0.8 ? vec3(0.42, 0.24, 0.66)          // 紫：风铃草、勿忘我
-       : vec3(0.72, 0.1, 0.06);                      // 红：虞美人（少一些）
+  return hue < 0.46 ? vec3(0.9, 0.62, 0.06)          // 黄：毛茛、金莲花
+       : hue < 0.62 ? vec3(0.88, 0.88, 0.82)         // 白：蓍草
+       : hue < 0.8 ? vec3(0.42, 0.24, 0.66)          // 紫：草原老鹳草
+       : vec3(0.72, 0.1, 0.06);                      // 红：野罂粟 / 虞美人（少一些）
 }
 float flowerCover(vec2 w) {
   float clump = vnoise(w * 0.06 + 2.0) * 0.55 + vnoise(w * 0.17 + 7.0) * 0.3 + vnoise(w * 0.6) * 0.15;
