@@ -98,3 +98,7 @@ three.js 从 CDN 加载，需要联网。
 - `src/config.js`：太阳方向、光照强度、配色、草地二分色默认值、羊的上限等参数
 - `src/devPanel.js`、`src/tuning.js`：开发版的画面调节面板，参数存取（tuning.json；正式版只读不写）
 - `src/sheepShader.js`：插画风的羊（与草地同一套受光量：太阳朝向 × 云影 × 投影）
+
+## 许可
+
+源代码采用 MIT 许可（见 [LICENSE](LICENSE)）。小羊模型（`assets/sheep.pack`）和羊叫声（`assets/sounds/`）不在 MIT 许可范围内，各自的授权见 [CREDITS.md](CREDITS.md)。
