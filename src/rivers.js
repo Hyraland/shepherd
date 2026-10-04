@@ -72,7 +72,10 @@ ${r.m.map(([a, fr, p]) => `  c += ${f(a)} * sin(u * ${f(fr)} + ${f(p)});
   w = ${f(r.w)} * (0.7 + 0.6 * vnoise(vec2(u * 0.04, ${f(i * 7)})));
   d = abs(v - c) * inversesqrt(1.0 + dc * dc) - w;
   if (d < best) { best = d; rw = w; }`).join('\n')}
-  best += (vnoise(p * 0.7) - 0.5) * 0.5 + (vnoise(p * 2.3) - 0.5) * 0.18;
+  // 岸线的细小曲折：远到小于一个像素时逐渐抹平，否则岸边会变成一排锯齿
+  float cd = length(p - cameraPosition.xz);
+  best += (vnoise(p * 0.7) - 0.5) * 0.5 * (1.0 - smoothstep(60.0, 220.0, cd))
+        + (vnoise(p * 2.3) - 0.5) * 0.18 * (1.0 - smoothstep(20.0, 70.0, cd));
   return best;
 }
 

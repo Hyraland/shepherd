@@ -36,7 +36,8 @@
     "zenith": "#2a66bd",
     "horizon": "#c2d8ee",
     "band": 0.33,
-    "haze": 0.59,
+    "haze": 0.31,
+    "air": 0.26,
     "exposure": 1.65,
     "bloom": 1.5,
     "cloudCover": 0.17,
@@ -62,5 +63,5 @@
     "music": 1.06,
     "musicStyle": "kuy"
   },
-  "savedAt": 1791111763063
+  "savedAt": 1791120984166
 }

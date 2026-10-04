@@ -118,7 +118,8 @@ uniform float uRipple;
 uniform float uGlitter;
 uniform float uFlowers;
 uniform float uGrassHues;   // 草叶里“藏”的杂色有多少（见 grass.js）
-uniform float uForestHues;  // 云杉枝片里藏的杂色（见 scenery.js）
+uniform float uForestHues;
+uniform float uAir;         // 空气感（中远景的薄雾）  // 云杉枝片里藏的杂色（见 scenery.js）
 uniform float uSkyBand;
 uniform float uHazeLift;
 uniform float uExposure;
@@ -269,6 +270,9 @@ vec3 applyFog(vec3 col, vec3 wp) {
   float d = length(v);
   // 雾气贴着谷底更浓，山顶更通透（uHazeLift 越大，雾气升得越高，远山越淡）
   float f = 1.0 - exp(-pow(d * uFogDensity, 2.0) * exp(-max(wp.y, 0.0) / uHazeLift));
+  // 空气感：随距离线性增加的一层薄薄的空气（贴着谷底更浓），中景就开始一层层退远
+  float air = 1.0 - exp(-d * uAir * 0.0012 * exp(-max(wp.y - cameraPosition.y, 0.0) / 380.0));
+  f = 1.0 - (1.0 - f) * (1.0 - air);
   vec3 dir = v / max(d, 1e-3);
   float s = pow(max(dot(normalize(vec3(dir.x, 0.0, dir.z)), normalize(vec3(uSunDir.x, 0.0, uSunDir.z))), 0.0), 3.0);
   return mix(col, mix(uFogColor, uHaze / uExposure, s * 0.35), f);

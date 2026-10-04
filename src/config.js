@@ -70,6 +70,7 @@ export const TUNING_DEFAULTS = {
     horizon: '#c2d8ee',     // 地平线颜色（远处的雾也是这个颜色）
     band: 0.32,             // 地平线浅色带的高度（越小，蓝色越往下压）
     haze: 0.5,              // 空气中的雾气：远山被冲淡成蓝白色的程度
+    air: 0.4,               // 空气感：中远景随距离一层层退远的薄雾（0 = 没有）
     exposure: 1.3,          // 曝光（只影响写实着色的部分：水、林子、山体；草和羊的颜色不受它影响）
     bloom: 0.35,            // 强光（水面闪光、日轮）的辉光
     cloudCover: 0.5,        // 云影覆盖的多少
@@ -187,6 +188,7 @@ export function createSharedUniforms() {
     uFlowers: { value: 0.4 },
     uGrassHues: { value: 0.55 },
     uForestHues: { value: 0.5 },
+    uAir: { value: 0.4 },
     uSkyBand: { value: 0.2 },
     uHazeLift: { value: 400 },
     uExposure: exposureUniform,
@@ -210,6 +212,7 @@ export function applyTuning(U, t) {
   U.uSkyBand.value = k.band;
   U.uFogDensity.value = 0.00018 + 0.0006 * k.haze;
   U.uHazeLift.value = 220 + 500 * k.haze;
+  U.uAir.value = k.air;
   bloomUniform.value = k.bloom;
   cloudUniform.value.set(k.cloudCover, k.cloudStrength, k.cloudSoftness, k.cloudSpeed);
 

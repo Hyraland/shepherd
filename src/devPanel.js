@@ -66,6 +66,7 @@ export function createDevPanel(U, tuning, { onSheepStyle, onPlayMusic } = {}) {
   k.addColor(tuning.sky, 'horizon').name('地平线颜色').onChange(changed);
   k.add(tuning.sky, 'band', 0.04, 0.8, 0.01).name('地平线浅色带高度').onChange(changed);
   k.add(tuning.sky, 'haze', 0, 1, 0.01).name('远处雾气').onChange(changed);
+  k.add(tuning.sky, 'air', 0, 1.5, 0.01).name('空气感（中景薄雾）').onChange(changed);
   k.add(tuning.sky, 'exposure', 0.6, 2.2, 0.01).name('曝光（水/林/山）').onChange(changed);
   k.add(tuning.sky, 'bloom', 0, 1.5, 0.01).name('强光辉光').onChange(changed);
   k.add(tuning.sky, 'cloudCover', 0, 1, 0.01).name('云影覆盖').onChange(changed);
