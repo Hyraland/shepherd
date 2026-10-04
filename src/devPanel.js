@@ -38,6 +38,10 @@ export function createDevPanel(U, tuning, { onSheepStyle } = {}) {
   g.add(tuning.grass, 'variation', 0, 1, 0.01).name('深色的多少').onChange(changed);
   g.add(tuning.grass, 'flowers', 0, 1, 0.01).name('野花').onChange(changed);
 
+  const f = gui.addFolder('云杉林');
+  f.addColor(tuning.forest, 'lit').name('亮面颜色').onChange(changed);
+  f.addColor(tuning.forest, 'shade').name('暗面颜色').onChange(changed);
+
   const s = gui.addFolder('羊');
   s.add(tuning.sheep, 'toon').name('插画光影（关 = 写实）').onChange((v) => { changed(); onSheepStyle?.(v); });
   s.addColor(tuning.sheep, 'light').name('亮面颜色').onChange(changed);

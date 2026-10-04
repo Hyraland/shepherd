@@ -187,7 +187,7 @@ export class Flock {
           dvx = (tx / td) * sp; dvz = (tz / td) * sp;
           if (aliN && !catchup) { dvx += (aliX / aliN - s.vx) * 0.5 * herd; dvz += (aliZ / aliN - s.vz) * 0.5 * herd; }
           if (catchup && td < 1.6) s.mode = 'walk';
-          if (td < 1.2) { s.mode = 'graze'; s.stepT = 1 + Math.random() * 3; s.wx = s.wz = 0; }
+          if (td < 1.2) { s.mode = 'graze'; s.stepT = 0.4 + Math.random() * 1.8; s.wx = s.wz = 0; s.needTurn = true; }
           // 赶路途中停下来吃几口（同一时间最多两三只，挨着的羊有时会一起停）
           if (s.mode === 'walk' && travelling && td < 6) {
             s.nibbleIn -= dt;
@@ -208,8 +208,18 @@ export class Flock {
         } else {
           s.stepT -= dt;
           if (s.stepT < 0) {
+            // 走回来时是朝着人的；停下吃草后慢慢转开——多半侧身或背对着人，不一直盯着你看
+            const toCam = Math.atan2(cam.x - s.x, cam.z - s.z);
+            const facing = Math.cos(wrapAngle(s.heading - toCam));   // 1 = 正对着人
+            s.faceTo = s.heading;
+            if (s.needTurn || facing > 0.35 || Math.random() < 0.25) {
+              s.faceTo = Math.random() < 0.6
+                ? toCam + (Math.random() < 0.5 ? 1 : -1) * (Math.PI / 2 + (Math.random() - 0.5) * 0.9)
+                : toCam + Math.PI + (Math.random() - 0.5) * 1.3;
+            }
+            s.needTurn = false;
             if (Math.random() < 0.45) {
-              const a = s.heading + (Math.random() - 0.5) * 1.6;
+              const a = s.faceTo + (Math.random() - 0.5) * 0.7;
               const sp = 0.22 + Math.random() * 0.2;
               s.wx = Math.sin(a) * sp; s.wz = Math.cos(a) * sp;
               s.stepT = 0.8 + Math.random() * 1.5;
@@ -289,14 +299,21 @@ export class Flock {
 
   pose(s, dt, time, cam) {
     const speed = Math.hypot(s.vx, s.vz);
+    let turnStep = 0;
     if (speed > 0.12) {
       const target = Math.atan2(s.vx, s.vz);
       const k = 1 - Math.exp(-dt * (speed > 1 ? 6 : 3));
       s.heading += wrapAngle(target - s.heading) * k;
+    } else if (s.state === 'flock' && s.mode === 'graze' && s.faceTo !== undefined) {
+      // 吃草时原地慢慢转身（迈着小碎步）
+      const d = wrapAngle(s.faceTo - s.heading);
+      turnStep = Math.sign(d) * Math.min(Math.abs(d), dt * 0.8);
+      s.heading += turnStep;
     }
 
-    s.phase += (dt * speed * 5.2) / s.scale;
-    const amp = Math.min(speed / 1.3, 1) * (speed > 2.4 ? 0.75 : 0.5);
+    const gait = Math.max(speed, dt ? (Math.abs(turnStep) / dt) * 0.35 : 0);
+    s.phase += (dt * gait * 5.2) / s.scale;
+    const amp = Math.min(gait / 1.3, 1) * (gait > 2.4 ? 0.75 : 0.5);
     const sw = Math.sin(s.phase) * amp;
     s.legs[0].rotation.x = sw;
     s.legs[1].rotation.x = -sw;
@@ -304,7 +321,7 @@ export class Flock {
     s.legs[3].rotation.x = sw;
     s.tilt.position.y = Math.abs(Math.cos(s.phase)) * 0.045 * Math.min(speed / 2.5, 1);
 
-    // 头：吃草时低头啃，偶尔抬头张望；人靠近时会转头看你
+    // 头：吃草时低头啃，隔好一阵才抬头张望一下（人在附近时会顺便转头看你一眼）
     let tp, ty = 0;
     if (s.state === 'flock' && s.mode === 'nibble') {
       tp = 1.2 + 0.08 * Math.sin(time * 9 + s.id);
@@ -312,8 +329,8 @@ export class Flock {
       const dcx = cam.x - s.x, dcz = cam.z - s.z, dc = Math.hypot(dcx, dcz);
       if (s.lookT > 0) s.lookT -= dt;
       else {
-        s.nextLook -= dt * (dc < 8 ? 3 : 1);
-        if (s.nextLook < 0) { s.lookT = 1.5 + Math.random() * 2.5; s.nextLook = 4 + Math.random() * 10; }
+        s.nextLook -= dt;
+        if (s.nextLook < 0) { s.lookT = 1 + Math.random() * 1.5; s.nextLook = 10 + Math.random() * 20; }
       }
       if (s.lookT > 0) {
         tp = 0.05;

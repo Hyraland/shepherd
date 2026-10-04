@@ -42,6 +42,10 @@ export const TUNING_DEFAULTS = {
     variation: 0.5,         // 每丛深浅、叶根到叶尖的变化
     flowers: 0.4,           // 野花的多少（0 = 没有）
   },
+  forest: {                 // 二分色的云杉林（近处的树和远处山坡上的林子），和草地的颜色分开调
+    lit: '#65724d',         // 亮面
+    shade: '#454f6d',       // 暗面
+  },
   sheep: {
     toon: true,             // false = 写实材质
     light: '#fbf3e4',       // 亮面：阳光下白羊毛看起来的颜色
@@ -148,7 +152,7 @@ export function createSharedUniforms() {
     uSnow: { value: c('#f4f7ff') },
     uAlpine: { value: c('#64804c') },
     uForest: { value: c('#22352b') },
-    uForestLit: { value: new THREE.Color() },   // 二分色的云杉：亮面 / 暗面（由草地的颜色推出来，见 applyTuning）
+    uForestLit: { value: new THREE.Color() },   // 二分色的云杉：亮面 / 暗面（面板里单独调，见 applyTuning）
     uForestShade: { value: new THREE.Color() },
     uZenith: { value: c(PALETTE.zenith) },
     uShadowMap: { value: null },
@@ -209,9 +213,9 @@ export function applyTuning(U, t) {
   screenColor(g.shadow, U.uToonShadow.value);
   U.uToonEdge.value.set(g.edge, g.softness);
   U.uToonVar.value = g.variation;
-  // 云杉林和草地同一套色系：亮面是压暗、稍偏冷的“亮面深色”，暗面是压暗的草地暗面
-  U.uForestLit.value.copy(U.uToonLightDeep.value).lerp(U.uToonShadow.value, 0.25).multiplyScalar(0.7);
-  U.uForestShade.value.copy(U.uToonShadow.value).multiplyScalar(0.58);
+  // 云杉林：亮面 / 暗面单独调（默认值是原来从草地颜色推出来的那一对）
+  screenColor(t.forest.lit, U.uForestLit.value);
+  screenColor(t.forest.shade, U.uForestShade.value);
 
   screenColor(s.light, U.uSheepLight.value);
   // 羊的暗面：按 followGrass 向草地暗面的色相靠拢（保持原来的亮度）
