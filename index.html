@@ -37,7 +37,8 @@
 <script type="module">
   // 防缓存：每次加载都换一个路径前缀（serve.py 会把 /v<数字>/ 去掉）；用别的静态服务器时退回普通路径
   const base = `./v${Date.now()}/`;
-  const ok = await fetch(`${base}src/main.js`, { method: 'HEAD', cache: 'no-store' }).then((r) => r.ok).catch(() => false);
+  const local = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+  const ok = local && await fetch(`${base}src/main.js`, { method: 'HEAD', cache: 'no-store' }).then((r) => r.ok).catch(() => false);
   await import(`${ok ? base : './'}src/main.js`);
 </script>
 </body>

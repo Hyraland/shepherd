@@ -20,9 +20,8 @@
     （例如加密或专有格式），不能让人从网页里直接下载到 glTF/贴图。
   - no AI：不得用于机器学习 / 训练神经网络（包括生成式 AI）。
 - 因此：
-  - 本地开发随意使用；
-  - **不要把 models/sheep_cgtrader/ 和原始 zip 提交到公开仓库**（models/ 已在 .gitignore 里）；
-  - 公开发布前，需要把模型和贴图打包成加密的二进制、在页面里解密加载（而不是直接放 Sheep.gltf / PNG）。
+  - 公开发布用的是加密打包后的 `assets/sheep.pack`（`node tools/pack-sheep.mjs` 生成，AES-256-GCM），
+    页面里用 WebCrypto 解密后在内存中加载。
 
 ## 声音：assets/sounds（羊叫）
 

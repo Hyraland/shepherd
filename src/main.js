@@ -157,6 +157,8 @@ let firstLook;
 try {
   firstLook = await loadLook(lookId, scene);
 } catch (e) {
+  // 开发版
+  if (!DEV) throw e;
   console.error(e);
   lookId = SHEEP_LOOKS.find((d) => d.id !== lookId).id;
   firstLook = await loadLook(lookId, scene);

@@ -3,8 +3,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SHEEP_CAPACITY } from './sheep.js';
 import { withClouds } from './materials.js';
 import { makeSheepMaterial, sheepToonEnabled, NECK_GLSL } from './sheepShader.js';
+import { loadPackedGLTF } from './sheepPack.js';
 
-// 几种小羊外观（正式版只用 1 号；授权见 CREDITS.md，1 号是 CGTrader 版税授权，公开发布前需要加密打包）。
+// 几种小羊外观（正式版只用 1 号；授权见 CREDITS.md）。1 号是 CGTrader 版税授权
 // 都是不带骨骼的静态模型：腿在顶点着色器里按步伐摆动，头部（分开的部件）绕脖子转动。
 //   height    归一化后的总高度（米，乘上每只羊的体型系数）
 //   headNode  用来判断头朝哪边的部件
@@ -14,7 +15,7 @@ import { makeSheepMaterial, sheepToonEnabled, NECK_GLSL } from './sheepShader.js
 export const SHEEP_LOOKS = [
   {
     id: 'cgtrader', label: 'Realistic Sheep · WildMesh3D（CGTrader）',
-    url: 'models/sheep_cgtrader/Sheep.gltf', height: 1.0, headNode: 'sm_1_0_0',
+    pack: 'assets/sheep.pack', height: 1.0, headNode: 'sm_1_0_0',
     headParts: ['sm_1_0_0', 'sm_2_0_0'], hip: 0.36, wool: ['Material.001', 'Material'],
   },
   {
@@ -134,7 +135,7 @@ function withRig(material, hipY, neck) {
 }
 
 async function buildTemplate(def) {
-  const gltf = await loader.loadAsync(def.url);
+  const gltf = def.pack ? await loadPackedGLTF(def.pack) : await loader.loadAsync(def.url);
   applySpecGlossColors(gltf);
   const head = def.headNode ? gltf.scene.getObjectByName(def.headNode) : null;
   const outer = normalize(gltf.scene, head, def.height);
